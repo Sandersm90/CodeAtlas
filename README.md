@@ -12,6 +12,8 @@ A Claude Code plugin that gives every project a persistent, searchable wiki know
 - **`wiki_update`** — create or update a page and re-embed it
 - **`wiki_ingest`** — process a raw source file into wiki pages via Claude
 - **`wiki_lint`** — health check: broken links, orphan pages, stale embeddings, missing concepts
+- **`wiki_delete`** — remove a page and its vectors from the database
+- **`wiki_rename`** — rename a page and rewrite all incoming `[[links]]` atomically
 - **`/wiki-ingest <file>`** — ingest shortcut
 - **`/wiki-lint`** — lint shortcut
 - **`/wiki-search <query>`** — search shortcut

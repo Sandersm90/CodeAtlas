@@ -47,6 +47,8 @@ claude plugin install github:synnode/codeatlas
 | `wiki_update` | Create or update a page (re-embeds automatically) |
 | `wiki_ingest` | Process a raw file into wiki pages via Claude |
 | `wiki_lint` | Health check: broken links, orphans, stale embeddings |
+| `wiki_delete` | Delete a page and remove its vectors |
+| `wiki_rename` | Rename a page and rewrite all `[[links]]` across the wiki |
 
 ## Wiki page format
 
