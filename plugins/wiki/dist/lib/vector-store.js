@@ -104,7 +104,7 @@ function upsertPage(db, page, chunks) {
             .prepare("SELECT id FROM wiki_chunks WHERE page = ?")
             .all(page);
         if (existingIds.length > 0) {
-            const ids = existingIds.map((r) => r.id);
+            const ids = existingIds.map((r) => BigInt(r.id));
             const placeholders = ids.map(() => "?").join(", ");
             db.prepare(`DELETE FROM wiki_vectors WHERE rowid IN (${placeholders})`).run(...ids);
             db.prepare(`DELETE FROM wiki_chunks WHERE page = ?`).run(page);
@@ -115,7 +115,7 @@ function upsertPage(db, page, chunks) {
         const insertVector = db.prepare(`INSERT INTO wiki_vectors (rowid, embedding) VALUES (?, ?)`);
         for (const chunk of chunks) {
             const result = insertChunk.run(page, chunk.chunk_idx, chunk.content, now);
-            const rowid = Number(result.lastInsertRowid);
+            const rowid = BigInt(result.lastInsertRowid);
             insertVector.run(rowid, serializeVector(chunk.embedding));
         }
     });

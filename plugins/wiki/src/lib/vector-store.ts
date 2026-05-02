@@ -93,7 +93,7 @@ export function upsertPage(
       .all(page) as { id: number }[];
 
     if (existingIds.length > 0) {
-      const ids = existingIds.map((r) => r.id);
+      const ids = existingIds.map((r) => BigInt(r.id));
       const placeholders = ids.map(() => "?").join(", ");
 
       db.prepare(`DELETE FROM wiki_vectors WHERE rowid IN (${placeholders})`).run(
@@ -118,7 +118,7 @@ export function upsertPage(
         chunk.content,
         now
       );
-      const rowid = Number(result.lastInsertRowid);
+      const rowid = BigInt(result.lastInsertRowid);
       insertVector.run(rowid, serializeVector(chunk.embedding));
     }
   });
