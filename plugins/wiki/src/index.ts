@@ -25,6 +25,7 @@ import { wikiLint } from "./tools/wiki-lint";
 import { wikiDelete, WikiDeleteSchema } from "./tools/wiki-delete";
 import { wikiRename, WikiRenameSchema } from "./tools/wiki-rename";
 import { wikiContextFor, WikiContextForSchema } from "./tools/wiki-context-for";
+import { wikiList, WikiListSchema } from "./tools/wiki-list";
 
 // Initialize DB at startup so errors surface early
 import { initializeDb, getDb } from "./db";
@@ -158,6 +159,12 @@ async function main(): Promise<void> {
           inputSchema: zodToJsonSchema(WikiRenameSchema),
         },
         {
+          name: "wiki_list",
+          description:
+            "List all wiki pages with their title, tags, and updated date. Optionally filter by tags.",
+          inputSchema: zodToJsonSchema(WikiListSchema),
+        },
+        {
           name: "wiki_context_for",
           description:
             "Given a source file path, extracts the filename and symbols (classes, functions, types) and returns the most relevant wiki pages. Use this when opening a file to automatically load relevant context without manually guessing search terms.",
@@ -211,6 +218,12 @@ async function main(): Promise<void> {
         case "wiki_rename": {
           const input = WikiRenameSchema.parse(args);
           const result = await wikiRename(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_list": {
+          const input = WikiListSchema.parse(args);
+          const result = await wikiList(input);
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
 

@@ -22,84 +22,83 @@ exports.WikiSearchSchema = zod_1.z.object({
         .enum(["hybrid", "semantic", "keyword"])
         .default("hybrid")
         .describe("Search mode: hybrid (default), semantic only, or keyword only"),
+    tags: zod_1.z.array(zod_1.z.string()).optional().describe("Filter results to pages that have ALL specified tags"),
 });
+function matchesTags(page, requiredTags) {
+    const p = (0, wiki_fs_1.readPage)(page);
+    if (!p)
+        return false;
+    const pageTags = Array.isArray(p.frontmatter.tags)
+        ? p.frontmatter.tags.map((t) => t.toLowerCase())
+        : [];
+    return requiredTags.every((t) => pageTags.includes(t.toLowerCase()));
+}
 /**
  * Handles the wiki_search tool call.
  */
 async function wikiSearch(input) {
-    const { query, limit = 5, mode = "hybrid" } = input;
+    const { query, limit = 5, mode = "hybrid", tags } = input;
     const db = (0, db_1.getDb)();
+    const filterLimit = tags && tags.length > 0 ? limit * 4 : limit;
+    const applyTagFilter = (items) => tags && tags.length > 0
+        ? items.filter((r) => matchesTags(r.page, tags)).slice(0, limit)
+        : items.slice(0, limit);
     if (mode === "keyword") {
-        // Pure BM25 keyword search
         let kwResults;
         try {
-            kwResults = await (0, bm25_1.search)(query, limit);
+            kwResults = await (0, bm25_1.search)(query, filterLimit);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
         }
         return {
-            results: kwResults.map((r) => ({
+            results: applyTagFilter(kwResults.map((r) => ({
                 page: r.page,
                 excerpt: r.excerpt,
                 score: r.score,
                 path: r.path,
-            })),
+            }))),
         };
     }
     if (mode === "semantic") {
-        // Pure semantic (vector) search
         let queryVec;
         try {
             queryVec = await (0, embedder_1.embed)(query);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            return {
-                error: `Failed to embed query via Ollama: ${message}`,
-                code: "EMBEDDING_ERROR",
-            };
+            return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
         }
         let semResults;
         try {
-            semResults = (0, vector_store_1.searchSimilar)(db, queryVec, limit);
+            semResults = (0, vector_store_1.searchSimilar)(db, queryVec, filterLimit);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             return { error: `Vector search failed: ${message}`, code: "SEARCH_ERROR" };
         }
-        // Deduplicate by page name, keep highest score per page
         const seen = new Map();
         for (const r of semResults) {
             if (!seen.has(r.page) || r.score > (seen.get(r.page)?.score ?? 0)) {
-                seen.set(r.page, {
-                    page: r.page,
-                    excerpt: r.excerpt,
-                    score: r.score,
-                    path: (0, wiki_fs_1.resolvePage)(r.page),
-                });
+                seen.set(r.page, { page: r.page, excerpt: r.excerpt, score: r.score, path: (0, wiki_fs_1.resolvePage)(r.page) });
             }
         }
-        return { results: Array.from(seen.values()).slice(0, limit) };
+        return { results: applyTagFilter(Array.from(seen.values())) };
     }
     // Hybrid: run both searches and combine with RRF
-    const semFetchCount = limit * 3; // fetch more to give RRF room to work
-    const kwFetchCount = limit * 3;
+    const fetchCount = filterLimit * 3;
     let queryVec;
     try {
         queryVec = await (0, embedder_1.embed)(query);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return {
-            error: `Failed to embed query via Ollama: ${message}`,
-            code: "EMBEDDING_ERROR",
-        };
+        return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
     }
     let semResults;
     try {
-        semResults = (0, vector_store_1.searchSimilar)(db, queryVec, semFetchCount);
+        semResults = (0, vector_store_1.searchSimilar)(db, queryVec, fetchCount);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -107,20 +106,20 @@ async function wikiSearch(input) {
     }
     let kwResults;
     try {
-        kwResults = await (0, bm25_1.search)(query, kwFetchCount);
+        kwResults = await (0, bm25_1.search)(query, fetchCount);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
     }
-    const combined = (0, rrf_1.reciprocalRankFusion)(semResults, kwResults, 60, limit);
-    // Fill in page paths that may be missing from semantic-only results
-    const results = combined.map((r) => ({
-        page: r.page,
-        excerpt: r.excerpt,
-        score: r.score,
-        path: r.path || (0, wiki_fs_1.resolvePage)(r.page),
-    }));
-    return { results };
+    const combined = (0, rrf_1.reciprocalRankFusion)(semResults, kwResults, 60, filterLimit);
+    return {
+        results: applyTagFilter(combined.map((r) => ({
+            page: r.page,
+            excerpt: r.excerpt,
+            score: r.score,
+            path: r.path || (0, wiki_fs_1.resolvePage)(r.page),
+        }))),
+    };
 }
 //# sourceMappingURL=wiki-search.js.map

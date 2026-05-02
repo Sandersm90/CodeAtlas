@@ -10,14 +10,17 @@ export declare const WikiUpdateSchema: z.ZodObject<{
     page: z.ZodString;
     content: z.ZodString;
     reason: z.ZodOptional<z.ZodString>;
+    dry_run: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     content: string;
     page: string;
     reason?: string | undefined;
+    dry_run?: boolean | undefined;
 }, {
     content: string;
     page: string;
     reason?: string | undefined;
+    dry_run?: boolean | undefined;
 }>;
 export type WikiUpdateInput = z.infer<typeof WikiUpdateSchema>;
 export interface WikiUpdateSuccess {
@@ -26,11 +29,23 @@ export interface WikiUpdateSuccess {
     path: string;
     missing_links?: string[];
 }
+export interface WikiUpdateDryRun {
+    dry_run: true;
+    page: string;
+    is_new: boolean;
+    old_content: string | null;
+    new_content: string;
+    line_changes: {
+        added: number;
+        removed: number;
+    };
+    missing_links?: string[];
+}
 export interface WikiUpdateError {
     error: string;
     code: string;
 }
-export type WikiUpdateResult = WikiUpdateSuccess | WikiUpdateError;
+export type WikiUpdateResult = WikiUpdateSuccess | WikiUpdateDryRun | WikiUpdateError;
 /**
  * Handles the wiki_update tool call.
  */

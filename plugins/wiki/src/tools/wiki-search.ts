@@ -10,7 +10,7 @@ import { embed } from "../lib/embedder";
 import { searchSimilar } from "../lib/vector-store";
 import { search as bm25Search } from "../lib/bm25";
 import { reciprocalRankFusion, CombinedResult } from "../lib/rrf";
-import { resolvePage } from "../lib/wiki-fs";
+import { resolvePage, readPage } from "../lib/wiki-fs";
 import { getDb } from "../db";
 
 export const WikiSearchSchema = z.object({
@@ -20,6 +20,7 @@ export const WikiSearchSchema = z.object({
     .enum(["hybrid", "semantic", "keyword"])
     .default("hybrid")
     .describe("Search mode: hybrid (default), semantic only, or keyword only"),
+  tags: z.array(z.string()).optional().describe("Filter results to pages that have ALL specified tags"),
 });
 
 export type WikiSearchInput = z.infer<typeof WikiSearchSchema>;
@@ -42,88 +43,88 @@ export interface WikiSearchError {
 
 export type WikiSearchResult = WikiSearchSuccess | WikiSearchError;
 
+function matchesTags(page: string, requiredTags: string[]): boolean {
+  const p = readPage(page);
+  if (!p) return false;
+  const pageTags: string[] = Array.isArray(p.frontmatter.tags)
+    ? (p.frontmatter.tags as string[]).map((t) => t.toLowerCase())
+    : [];
+  return requiredTags.every((t) => pageTags.includes(t.toLowerCase()));
+}
+
 /**
  * Handles the wiki_search tool call.
  */
 export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResult> {
-  const { query, limit = 5, mode = "hybrid" } = input;
+  const { query, limit = 5, mode = "hybrid", tags } = input;
   const db = getDb();
+  const filterLimit = tags && tags.length > 0 ? limit * 4 : limit;
+
+  const applyTagFilter = (items: SearchResultItem[]): SearchResultItem[] =>
+    tags && tags.length > 0
+      ? items.filter((r) => matchesTags(r.page, tags)).slice(0, limit)
+      : items.slice(0, limit);
 
   if (mode === "keyword") {
-    // Pure BM25 keyword search
     let kwResults;
     try {
-      kwResults = await bm25Search(query, limit);
+      kwResults = await bm25Search(query, filterLimit);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
     }
 
     return {
-      results: kwResults.map((r) => ({
+      results: applyTagFilter(kwResults.map((r) => ({
         page: r.page,
         excerpt: r.excerpt,
         score: r.score,
         path: r.path,
-      })),
+      }))),
     };
   }
 
   if (mode === "semantic") {
-    // Pure semantic (vector) search
     let queryVec: number[];
     try {
       queryVec = await embed(query);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return {
-        error: `Failed to embed query via Ollama: ${message}`,
-        code: "EMBEDDING_ERROR",
-      };
+      return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
     }
 
     let semResults;
     try {
-      semResults = searchSimilar(db, queryVec, limit);
+      semResults = searchSimilar(db, queryVec, filterLimit);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { error: `Vector search failed: ${message}`, code: "SEARCH_ERROR" };
     }
 
-    // Deduplicate by page name, keep highest score per page
     const seen = new Map<string, SearchResultItem>();
     for (const r of semResults) {
       if (!seen.has(r.page) || r.score > (seen.get(r.page)?.score ?? 0)) {
-        seen.set(r.page, {
-          page: r.page,
-          excerpt: r.excerpt,
-          score: r.score,
-          path: resolvePage(r.page),
-        });
+        seen.set(r.page, { page: r.page, excerpt: r.excerpt, score: r.score, path: resolvePage(r.page) });
       }
     }
 
-    return { results: Array.from(seen.values()).slice(0, limit) };
+    return { results: applyTagFilter(Array.from(seen.values())) };
   }
 
   // Hybrid: run both searches and combine with RRF
-  const semFetchCount = limit * 3; // fetch more to give RRF room to work
-  const kwFetchCount = limit * 3;
+  const fetchCount = filterLimit * 3;
 
   let queryVec: number[];
   try {
     queryVec = await embed(query);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      error: `Failed to embed query via Ollama: ${message}`,
-      code: "EMBEDDING_ERROR",
-    };
+    return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
   }
 
   let semResults;
   try {
-    semResults = searchSimilar(db, queryVec, semFetchCount);
+    semResults = searchSimilar(db, queryVec, fetchCount);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: `Vector search failed: ${message}`, code: "SEARCH_ERROR" };
@@ -131,26 +132,20 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
 
   let kwResults;
   try {
-    kwResults = await bm25Search(query, kwFetchCount);
+    kwResults = await bm25Search(query, fetchCount);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
   }
 
-  const combined: CombinedResult[] = reciprocalRankFusion(
-    semResults,
-    kwResults,
-    60,
-    limit
-  );
+  const combined: CombinedResult[] = reciprocalRankFusion(semResults, kwResults, 60, filterLimit);
 
-  // Fill in page paths that may be missing from semantic-only results
-  const results: SearchResultItem[] = combined.map((r) => ({
-    page: r.page,
-    excerpt: r.excerpt,
-    score: r.score,
-    path: r.path || resolvePage(r.page),
-  }));
-
-  return { results };
+  return {
+    results: applyTagFilter(combined.map((r) => ({
+      page: r.page,
+      excerpt: r.excerpt,
+      score: r.score,
+      path: r.path || resolvePage(r.page),
+    }))),
+  };
 }

@@ -50,6 +50,7 @@ claude plugin install github:synnode/codeatlas
 | `wiki_delete` | Delete a page and remove its vectors |
 | `wiki_rename` | Rename a page and rewrite all `[[links]]` across the wiki |
 | `wiki_context_for` | Given a source file, auto-detect relevant wiki pages from filename + symbols |
+| `wiki_list` | List all pages with title, tags, updated date — optionally filter by tags |
 
 ## Wiki page format
 

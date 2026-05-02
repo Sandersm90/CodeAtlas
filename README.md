@@ -15,6 +15,9 @@ A Claude Code plugin that gives every project a persistent, searchable wiki know
 - **`wiki_delete`** — remove a page and its vectors from the database
 - **`wiki_rename`** — rename a page and rewrite all incoming `[[links]]` atomically
 - **`wiki_context_for`** — given a source file path, extract filename + symbols and return the most relevant wiki pages automatically
+- **`wiki_list`** — enumerate all pages with title, tags, updated date; supports tag filtering
+- **`wiki_search`** now supports `tags` filter to scope results to specific tags
+- **`wiki_update`** now supports `dry_run: true` to preview changes without writing
 - **`/wiki-ingest <file>`** — ingest shortcut
 - **`/wiki-lint`** — lint shortcut
 - **`/wiki-search <query>`** — search shortcut

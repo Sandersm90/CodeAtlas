@@ -24,12 +24,26 @@ exports.WikiUpdateSchema = zod_1.z.object({
     page: zod_1.z.string().min(1).describe("Page name without .md extension, e.g. 'AccessManager'"),
     content: zod_1.z.string().min(1).describe("Full markdown content including YAML frontmatter"),
     reason: zod_1.z.string().optional().describe("Brief description of why this page was updated"),
+    dry_run: zod_1.z.boolean().optional().describe("If true, validate and diff without writing to disk or re-embedding"),
 });
+function diffLines(oldText, newText) {
+    const oldLines = new Set(oldText.split("\n"));
+    const newLines = new Set(newText.split("\n"));
+    let added = 0;
+    let removed = 0;
+    for (const line of newText.split("\n"))
+        if (!oldLines.has(line))
+            added++;
+    for (const line of oldText.split("\n"))
+        if (!newLines.has(line))
+            removed++;
+    return { added, removed };
+}
 /**
  * Handles the wiki_update tool call.
  */
 async function wikiUpdate(input) {
-    const { page, content } = input;
+    const { page, content, dry_run } = input;
     // Parse and validate frontmatter
     let parsed;
     try {
@@ -47,6 +61,21 @@ async function wikiUpdate(input) {
         return {
             error: `Page frontmatter is missing required fields: ${missing.join(", ")}. All wiki pages must have "title", "tags", and "updated" fields.`,
             code: "MISSING_FRONTMATTER_FIELDS",
+        };
+    }
+    const referencedLinks = (0, wiki_fs_1.extractWikiLinks)(parsed.content);
+    const missingLinks = referencedLinks.filter((link) => !(0, wiki_fs_1.pageExists)(link));
+    if (dry_run) {
+        const existing = (0, wiki_fs_1.readPage)(page);
+        const oldContent = existing?.content ?? null;
+        return {
+            dry_run: true,
+            page,
+            is_new: !existing,
+            old_content: oldContent,
+            new_content: content,
+            line_changes: oldContent ? diffLines(oldContent, content) : { added: content.split("\n").length, removed: 0 },
+            ...(missingLinks.length > 0 ? { missing_links: missingLinks } : {}),
         };
     }
     // Write page to disk
@@ -96,9 +125,6 @@ async function wikiUpdate(input) {
     }
     // Invalidate BM25 index so it's rebuilt on next search
     (0, bm25_1.invalidateIndex)();
-    // Warn about [[links]] that reference pages that don't exist yet
-    const referencedLinks = (0, wiki_fs_1.extractWikiLinks)(parsed.content);
-    const missingLinks = referencedLinks.filter((link) => !(0, wiki_fs_1.pageExists)(link));
     return {
         success: true,
         chunks_embedded: chunks.length,

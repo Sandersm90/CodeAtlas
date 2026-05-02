@@ -9,12 +9,15 @@ export declare const WikiSearchSchema: z.ZodObject<{
     query: z.ZodString;
     limit: z.ZodDefault<z.ZodNumber>;
     mode: z.ZodDefault<z.ZodEnum<["hybrid", "semantic", "keyword"]>>;
+    tags: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
 }, "strip", z.ZodTypeAny, {
     query: string;
     limit: number;
     mode: "hybrid" | "semantic" | "keyword";
+    tags?: string[] | undefined;
 }, {
     query: string;
+    tags?: string[] | undefined;
     limit?: number | undefined;
     mode?: "hybrid" | "semantic" | "keyword" | undefined;
 }>;

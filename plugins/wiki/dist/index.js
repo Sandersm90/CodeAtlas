@@ -22,6 +22,7 @@ const wiki_lint_1 = require("./tools/wiki-lint");
 const wiki_delete_1 = require("./tools/wiki-delete");
 const wiki_rename_1 = require("./tools/wiki-rename");
 const wiki_context_for_1 = require("./tools/wiki-context-for");
+const wiki_list_1 = require("./tools/wiki-list");
 // Initialize DB at startup so errors surface early
 const db_1 = require("./db");
 /**
@@ -132,6 +133,11 @@ async function main() {
                     inputSchema: zodToJsonSchema(wiki_rename_1.WikiRenameSchema),
                 },
                 {
+                    name: "wiki_list",
+                    description: "List all wiki pages with their title, tags, and updated date. Optionally filter by tags.",
+                    inputSchema: zodToJsonSchema(wiki_list_1.WikiListSchema),
+                },
+                {
                     name: "wiki_context_for",
                     description: "Given a source file path, extracts the filename and symbols (classes, functions, types) and returns the most relevant wiki pages. Use this when opening a file to automatically load relevant context without manually guessing search terms.",
                     inputSchema: zodToJsonSchema(wiki_context_for_1.WikiContextForSchema),
@@ -176,6 +182,11 @@ async function main() {
                 case "wiki_rename": {
                     const input = wiki_rename_1.WikiRenameSchema.parse(args);
                     const result = await (0, wiki_rename_1.wikiRename)(input);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                }
+                case "wiki_list": {
+                    const input = wiki_list_1.WikiListSchema.parse(args);
+                    const result = await (0, wiki_list_1.wikiList)(input);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 }
                 case "wiki_context_for": {
