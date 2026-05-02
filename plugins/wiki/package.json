@@ -1,10 +1,10 @@
 {
   "name": "@synnode/codeatlas",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "MCP server for per-project markdown knowledge base with semantic + keyword search",
   "main": "dist/index.js",
   "bin": {
-    "codeatlas": "./dist/index.js"
+    "codeatlas": "./dist/cli.js"
   },
   "files": [
     "dist/**",
