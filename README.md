@@ -53,7 +53,10 @@ The wiki skill auto-triggers: Claude searches before starting a task, updates af
 ## Installation
 
 ```bash
-# Inside Claude Code
+# 1. Add the CodeAtlas marketplace
+/plugin marketplace add synnode/codeatlas
+
+# 2. Install the wiki plugin
 /plugin install wiki@codeatlas
 ```
 
