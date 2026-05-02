@@ -1,10 +1,3 @@
-/**
- * wiki-ingest.ts
- *
- * MCP tool: wiki_ingest
- * Processes a raw source file from RAW_ROOT into one or more wiki pages
- * using the Anthropic API (claude-sonnet-4-6).
- */
 import { z } from "zod";
 export declare const WikiIngestSchema: z.ZodObject<{
     file: z.ZodString;
@@ -17,17 +10,17 @@ export declare const WikiIngestSchema: z.ZodObject<{
     hint?: string | undefined;
 }>;
 export type WikiIngestInput = z.infer<typeof WikiIngestSchema>;
-export interface WikiIngestSuccess {
-    pages_updated: string[];
-    pages_created: string[];
+export interface WikiIngestPayload {
+    file: string;
+    raw_content: string;
+    existing_pages: string[];
+    existing_page_contents: Record<string, string>;
+    instructions: string;
 }
 export interface WikiIngestError {
     error: string;
     code: string;
 }
-export type WikiIngestResult = WikiIngestSuccess | WikiIngestError;
-/**
- * Handles the wiki_ingest tool call.
- */
+export type WikiIngestResult = WikiIngestPayload | WikiIngestError;
 export declare function wikiIngest(input: WikiIngestInput): Promise<WikiIngestResult>;
 //# sourceMappingURL=wiki-ingest.d.ts.map
