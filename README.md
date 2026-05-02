@@ -6,21 +6,36 @@ A Claude Code plugin that gives every project a persistent, searchable wiki know
 
 ## What it does
 
-- **`/wiki-init`** — bootstrap the wiki in any project (creates `wiki/`, `raw/`, `.mcp.json`)
-- **`wiki_search`** — hybrid semantic + keyword search across all wiki pages
-- **`wiki_get`** — fetch a full wiki page by name
-- **`wiki_update`** — create or update a page and re-embed it
-- **`wiki_ingest`** — process a raw source file into wiki pages via Claude
-- **`wiki_lint`** — health check: broken links, orphan pages, stale embeddings, missing concepts
-- **`wiki_delete`** — remove a page and its vectors from the database
-- **`wiki_rename`** — rename a page and rewrite all incoming `[[links]]` atomically
-- **`wiki_context_for`** — given a source file path, extract filename + symbols and return the most relevant wiki pages automatically
-- **`wiki_list`** — enumerate all pages with title, tags, updated date; supports tag filtering
-- **`wiki_search`** now supports `tags` filter to scope results to specific tags
-- **`wiki_update`** now supports `dry_run: true` to preview changes without writing
+### Ingest
+- **`wiki_ingest`** — process raw sources into wiki pages via Claude
+  - `file` / `files[]` — local files from `RAW_ROOT`
+  - `url` / `urls[]` — fetch from web pages or GitHub file URLs directly (GitHub blob URLs auto-converted to raw)
+  - Deduplication: embeds a sample of each source and surfaces similar existing pages before Claude writes anything
 - **`/wiki-ingest <file>`** — ingest shortcut
-- **`/wiki-lint`** — lint shortcut
+
+### Search & retrieval
+- **`wiki_search`** — hybrid semantic + keyword search; supports `tags` filter
+- **`wiki_get`** — fetch a full wiki page by name
+- **`wiki_list`** — enumerate all pages with title, tags, updated date; supports tag filtering
+- **`wiki_context_for`** — given a source file path, extract filename + symbols and return the most relevant wiki pages automatically
 - **`/wiki-search <query>`** — search shortcut
+
+### Write
+- **`wiki_update`** — create or update a page and re-embed it
+  - `dry_run: true` — preview changes without writing
+  - `git_commit: true` — `git add + commit` after writing
+  - Incremental re-embedding: unchanged chunks skip Ollama, only changed chunks re-embed
+- **`wiki_delete`** — remove a page and its vectors
+- **`wiki_rename`** — rename a page and rewrite all incoming `[[links]]` atomically
+
+### Maintenance
+- **`wiki_lint`** — health check: broken links (with fuzzy suggestions), orphan pages, missing frontmatter, stale embeddings, missing concepts
+  - `fix: true` — auto-fix missing `updated` dates in frontmatter
+- **`wiki_reembed_all`** — batch re-embed stale pages (default) or all pages; returns `{reembedded, skipped, errors, total}`
+- **`/wiki-lint`** — lint shortcut
+
+### Bootstrap
+- **`/wiki-init`** — bootstrap the wiki in any project (creates `wiki/`, `raw/`, `.mcp.json`)
 
 The wiki skill auto-triggers: Claude searches before starting a task, updates after implementing something, and ingests when you provide a spec or notes.
 
