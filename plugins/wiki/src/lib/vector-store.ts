@@ -118,7 +118,7 @@ export function upsertPage(
         chunk.content,
         now
       );
-      const rowid = result.lastInsertRowid as number;
+      const rowid = Number(result.lastInsertRowid);
       insertVector.run(rowid, serializeVector(chunk.embedding));
     }
   });

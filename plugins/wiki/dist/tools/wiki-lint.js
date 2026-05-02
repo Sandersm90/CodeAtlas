@@ -23,25 +23,10 @@ const db_1 = require("../db");
  */
 function extractConceptCandidates(text) {
     const candidates = [];
-    // Single capitalized words (not at start of sentence, not common words)
-    const commonWords = new Set([
-        "The", "A", "An", "In", "On", "At", "By", "To", "Of", "For",
-        "And", "Or", "But", "With", "From", "This", "That", "These",
-        "Those", "It", "Is", "Are", "Was", "Were", "Be", "Been",
-        "Have", "Has", "Had", "Do", "Does", "Did", "Will", "Would",
-        "Can", "Could", "Should", "May", "Might", "Must",
-    ]);
-    // Match capitalized words that are not at the start of a line/sentence
-    const wordRegex = /(?<![.!?\n]\s{0,2})(?<!\[\[)\b([A-Z][a-zA-Z]{2,})\b(?!\]\])/g;
-    let match;
-    while ((match = wordRegex.exec(text)) !== null) {
-        const word = match[1];
-        if (!commonWords.has(word)) {
-            candidates.push(word);
-        }
-    }
-    // Multi-word capitalized phrases (e.g. "Access Manager", "Device Variant")
+    // Only multi-word Title Case phrases — avoids false positives from single
+    // PascalCase code identifiers (DoorController, AudioSource, etc.)
     const phraseRegex = /(?<!\[\[)\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b(?!\]\])/g;
+    let match;
     while ((match = phraseRegex.exec(text)) !== null) {
         candidates.push(match[1]);
     }

@@ -115,7 +115,7 @@ function upsertPage(db, page, chunks) {
         const insertVector = db.prepare(`INSERT INTO wiki_vectors (rowid, embedding) VALUES (?, ?)`);
         for (const chunk of chunks) {
             const result = insertChunk.run(page, chunk.chunk_idx, chunk.content, now);
-            const rowid = result.lastInsertRowid;
+            const rowid = Number(result.lastInsertRowid);
             insertVector.run(rowid, serializeVector(chunk.embedding));
         }
     });
