@@ -15,7 +15,7 @@ This project has a wiki knowledge base accessible via MCP tools.
 - **Start of every task** — run `wiki_search` with 2-3 keywords before writing any code
 - **After implementing something new** — run `wiki_update` to record design decisions
 - **Uncertain about existing architecture** — run `wiki_search` before making assumptions
-- **User provides a spec, doc, or notes** — place in `raw/` and run `wiki_ingest`
+- **User provides a spec, doc, or notes** — run `wiki_search` on the topic first for context, then run `wiki_ingest`
 
 ## Workflow
 
@@ -30,7 +30,7 @@ This project has a wiki knowledge base accessible via MCP tools.
 | `wiki_search` | Before starting any non-trivial task |
 | `wiki_get` | When you need a full page, not just an excerpt |
 | `wiki_update` | After implementing, deciding, or designing something |
-| `wiki_ingest` | When a new raw source is provided by the user |
+| `wiki_ingest` | When a new raw source is provided — always call `wiki_search` first for context |
 | `wiki_lint` | At the end of a large feature or refactor |
 
 ## Page format rules
