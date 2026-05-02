@@ -1,0 +1,9 @@
+{
+  "name": "wiki",
+  "version": "1.0.0",
+  "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
+  "author": {
+    "name": "michael",
+    "url": "https://fruitcake.nl"
+  }
+}

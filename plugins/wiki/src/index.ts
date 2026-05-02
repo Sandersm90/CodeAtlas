@@ -1,0 +1,239 @@
+/**
+ * index.ts
+ *
+ * MCP server entrypoint for wiki-mcp.
+ * Registers all 5 wiki tools and starts the stdio transport.
+ */
+
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+
+// Config is loaded (and validated) at import time — exits if required vars missing
+import { config } from "./config";
+
+// Tool handlers
+import { wikiGet, WikiGetSchema } from "./tools/wiki-get";
+import { wikiSearch, WikiSearchSchema } from "./tools/wiki-search";
+import { wikiUpdate, WikiUpdateSchema } from "./tools/wiki-update";
+import { wikiIngest, WikiIngestSchema } from "./tools/wiki-ingest";
+import { wikiLint } from "./tools/wiki-lint";
+
+// Initialize DB at startup so errors surface early
+import { getDb } from "./db";
+
+/**
+ * Converts a Zod schema to a JSON Schema object suitable for MCP tool definitions.
+ */
+function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
+  const shape = schema.shape;
+  const properties: Record<string, unknown> = {};
+  const required: string[] = [];
+
+  for (const [key, field] of Object.entries(shape)) {
+    const zodField = field as z.ZodTypeAny;
+    const isOptional =
+      zodField instanceof z.ZodOptional || zodField instanceof z.ZodDefault;
+
+    const innerField = isOptional
+      ? (zodField as z.ZodOptional<z.ZodTypeAny>).unwrap?.() ?? zodField
+      : zodField;
+
+    const description =
+      (zodField as { description?: string }).description ?? undefined;
+
+    let type = "string";
+    let extra: Record<string, unknown> = {};
+
+    const unwrapped =
+      innerField instanceof z.ZodDefault
+        ? (innerField as z.ZodDefault<z.ZodTypeAny>)._def.innerType
+        : innerField;
+
+    if (unwrapped instanceof z.ZodNumber) {
+      type = "number";
+    } else if (unwrapped instanceof z.ZodBoolean) {
+      type = "boolean";
+    } else if (unwrapped instanceof z.ZodEnum) {
+      type = "string";
+      extra["enum"] = (unwrapped as z.ZodEnum<[string, ...string[]]>).options;
+    } else if (unwrapped instanceof z.ZodArray) {
+      type = "array";
+    }
+
+    properties[key] = {
+      type,
+      ...(description ? { description } : {}),
+      ...extra,
+    };
+
+    if (!isOptional) {
+      required.push(key);
+    }
+  }
+
+  return {
+    type: "object",
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+  };
+}
+
+async function main(): Promise<void> {
+  // Ensure DB is initialized (surfaces errors immediately, not on first tool call)
+  try {
+    getDb();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[wiki-mcp] Failed to initialize database at "${config.dbPath}": ${message}`);
+    process.exit(1);
+  }
+
+  const server = new Server(
+    {
+      name: "wiki-mcp",
+      version: "1.0.0",
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  // --- List tools handler ---
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return {
+      tools: [
+        {
+          name: "wiki_get",
+          description:
+            "Fetch a single wiki page by name. Returns the full markdown content including frontmatter.",
+          inputSchema: zodToJsonSchema(WikiGetSchema),
+        },
+        {
+          name: "wiki_search",
+          description:
+            "Search the wiki using hybrid semantic + BM25 keyword search. Returns ranked results with excerpts.",
+          inputSchema: zodToJsonSchema(WikiSearchSchema),
+        },
+        {
+          name: "wiki_update",
+          description:
+            "Create a new wiki page or update an existing one. Validates frontmatter, writes to disk, and re-embeds the page in the vector store.",
+          inputSchema: zodToJsonSchema(WikiUpdateSchema),
+        },
+        {
+          name: "wiki_ingest",
+          description:
+            "Process a raw source file from RAW_ROOT into one or more wiki pages using Claude. The raw file is not deleted.",
+          inputSchema: zodToJsonSchema(WikiIngestSchema),
+        },
+        {
+          name: "wiki_lint",
+          description:
+            "Run a health check on the entire wiki. Finds broken links, orphan pages, missing frontmatter, stale embeddings, and referenced-but-missing concepts.",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+      ],
+    };
+  });
+
+  // --- Call tool handler ---
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+
+    try {
+      switch (name) {
+        case "wiki_get": {
+          const input = WikiGetSchema.parse(args);
+          const result = await wikiGet(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_search": {
+          const input = WikiSearchSchema.parse(args);
+          const result = await wikiSearch(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_update": {
+          const input = WikiUpdateSchema.parse(args);
+          const result = await wikiUpdate(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_ingest": {
+          const input = WikiIngestSchema.parse(args);
+          const result = await wikiIngest(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_lint": {
+          const result = await wikiLint();
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        default:
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: `Unknown tool: ${name}`, code: "UNKNOWN_TOOL" }),
+              },
+            ],
+            isError: true,
+          };
+      }
+    } catch (err) {
+      // Handle Zod validation errors
+      if (err instanceof z.ZodError) {
+        const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: `Invalid tool arguments: ${issues}`,
+                code: "VALIDATION_ERROR",
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ error: `Internal server error: ${message}`, code: "INTERNAL_ERROR" }),
+          },
+        ],
+        isError: true,
+      };
+    }
+  });
+
+  // Start stdio transport
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
+  // Log to stderr so it doesn't pollute the MCP stdio channel
+  console.error(
+    `[wiki-mcp] Server started. WIKI_ROOT=${config.wikiRoot}, OLLAMA_URL=${config.ollamaUrl}`
+  );
+}
+
+main().catch((err) => {
+  console.error(`[wiki-mcp] Fatal error:`, err);
+  process.exit(1);
+});
