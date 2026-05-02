@@ -53,10 +53,13 @@ The wiki skill auto-triggers: Claude searches before starting a task, updates af
 ## Installation
 
 ```bash
-# 1. Add the CodeAtlas marketplace
+# 1. Install the CLI globally (builds native modules correctly)
+npm install -g @synnode/codeatlas
+
+# 2. Add the CodeAtlas marketplace
 /plugin marketplace add synnode/codeatlas
 
-# 2. Install the wiki plugin
+# 3. Install the wiki plugin
 /plugin install wiki@codeatlas
 ```
 

@@ -77,8 +77,8 @@ export async function runInit(args: string[]): Promise<void> {
       mcpServers: {
         wiki: {
           type: "stdio",
-          command: "npx",
-          args: ["--package=@synnode/codeatlas", "--yes", "codeatlas"],
+          command: "codeatlas",
+          args: [],
           env: {
             WIKI_ROOT: opts.wikiRoot,
             RAW_ROOT: opts.rawRoot,
