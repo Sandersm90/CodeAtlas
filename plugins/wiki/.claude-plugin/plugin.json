@@ -1,5 +1,6 @@
 {
   "name": "wiki",
+  "version": "1.0.1",
   "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
   "author": {
     "name": "michael",
