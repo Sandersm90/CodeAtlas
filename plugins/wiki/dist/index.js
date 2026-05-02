@@ -19,6 +19,7 @@ const wiki_search_1 = require("./tools/wiki-search");
 const wiki_update_1 = require("./tools/wiki-update");
 const wiki_ingest_1 = require("./tools/wiki-ingest");
 const wiki_lint_1 = require("./tools/wiki-lint");
+const wiki_reembed_all_1 = require("./tools/wiki-reembed-all");
 const wiki_delete_1 = require("./tools/wiki-delete");
 const wiki_rename_1 = require("./tools/wiki-rename");
 const wiki_context_for_1 = require("./tools/wiki-context-for");
@@ -111,16 +112,18 @@ async function main() {
                 },
                 {
                     name: "wiki_ingest",
-                    description: "Process a raw source file from RAW_ROOT into one or more wiki pages using Claude. The raw file is not deleted.",
-                    inputSchema: zodToJsonSchema(wiki_ingest_1.WikiIngestSchema),
+                    description: "Process raw sources into wiki pages using Claude. Pass 'file'/'files' for local files from RAW_ROOT, or 'url'/'urls' to fetch from a web page or GitHub file URL directly. Sources can be mixed. Raw files are not deleted.",
+                    inputSchema: zodToJsonSchema(wiki_ingest_1.WikiIngestBaseSchema),
                 },
                 {
                     name: "wiki_lint",
-                    description: "Run a health check on the entire wiki. Finds broken links, orphan pages, missing frontmatter, stale embeddings, and referenced-but-missing concepts.",
-                    inputSchema: {
-                        type: "object",
-                        properties: {},
-                    },
+                    description: "Run a health check on the entire wiki. Finds broken links (with fuzzy suggestions), orphan pages, missing frontmatter, stale embeddings, and missing concepts. Pass fix:true to auto-fix missing 'updated' dates.",
+                    inputSchema: zodToJsonSchema(wiki_lint_1.WikiLintSchema),
+                },
+                {
+                    name: "wiki_reembed_all",
+                    description: "Re-embed wiki pages in the vector store. By default only re-embeds stale pages (updated date newer than last embed). Pass stale_only:false to force re-embed all pages.",
+                    inputSchema: zodToJsonSchema(wiki_reembed_all_1.WikiReembedAllSchema),
                 },
                 {
                     name: "wiki_delete",
@@ -171,7 +174,13 @@ async function main() {
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 }
                 case "wiki_lint": {
-                    const result = await (0, wiki_lint_1.wikiLint)();
+                    const input = wiki_lint_1.WikiLintSchema.parse(args);
+                    const result = await (0, wiki_lint_1.wikiLint)(input);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                }
+                case "wiki_reembed_all": {
+                    const input = wiki_reembed_all_1.WikiReembedAllSchema.parse(args);
+                    const result = await (0, wiki_reembed_all_1.wikiReembedAll)(input);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 }
                 case "wiki_delete": {

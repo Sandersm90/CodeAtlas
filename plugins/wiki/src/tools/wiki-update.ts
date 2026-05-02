@@ -7,11 +7,12 @@
  */
 
 import { z } from "zod";
+import { execSync } from "child_process";
 import matter from "gray-matter";
 import { readPage, writePage, validateFrontmatter, extractWikiLinks, pageExists } from "../lib/wiki-fs";
 import { chunkPage } from "../lib/chunker";
 import { embedBatch } from "../lib/embedder";
-import { upsertPage, ChunkVector } from "../lib/vector-store";
+import { upsertPage, ChunkVector, getChunkVectorsForPage } from "../lib/vector-store";
 import { invalidateIndex } from "../lib/bm25";
 import { getDb } from "../db";
 
@@ -20,6 +21,7 @@ export const WikiUpdateSchema = z.object({
   content: z.string().min(1).describe("Full markdown content including YAML frontmatter"),
   reason: z.string().optional().describe("Brief description of why this page was updated"),
   dry_run: z.boolean().optional().describe("If true, validate and diff without writing to disk or re-embedding"),
+  git_commit: z.boolean().optional().describe("If true, run git add + git commit after writing the page"),
 });
 
 export type WikiUpdateInput = z.infer<typeof WikiUpdateSchema>;
@@ -27,7 +29,9 @@ export type WikiUpdateInput = z.infer<typeof WikiUpdateSchema>;
 export interface WikiUpdateSuccess {
   success: true;
   chunks_embedded: number;
+  chunks_skipped: number;
   path: string;
+  git_committed?: boolean;
   missing_links?: string[];
 }
 
@@ -62,7 +66,7 @@ function diffLines(oldText: string, newText: string): { added: number; removed: 
  * Handles the wiki_update tool call.
  */
 export async function wikiUpdate(input: WikiUpdateInput): Promise<WikiUpdateResult> {
-  const { page, content, dry_run } = input;
+  const { page, content, dry_run, git_commit } = input;
 
   // Parse and validate frontmatter
   let parsed: matter.GrayMatterFile<string>;
@@ -116,30 +120,47 @@ export async function wikiUpdate(input: WikiUpdateInput): Promise<WikiUpdateResu
   // Chunk the page body for embedding
   const chunks = chunkPage(page, parsed.content);
 
-  // Generate embeddings for all chunks
-  let embeddings: number[][];
-  try {
-    const texts = chunks.map((c) => c.content);
-    embeddings = await embedBatch(texts);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      error: `Failed to generate embeddings via Ollama: ${message}`,
-      code: "EMBEDDING_ERROR",
-    };
+  // Incremental embedding: reuse existing vectors for unchanged chunks
+  const db = getDb();
+  const existingVectors = getChunkVectorsForPage(db, page);
+  const existingByIdx = new Map(existingVectors.map((v) => [v.chunk_idx, v]));
+
+  const toEmbed: typeof chunks = [];
+  const recycled: ChunkVector[] = [];
+
+  for (const chunk of chunks) {
+    const existing = existingByIdx.get(chunk.chunk_idx);
+    if (existing && existing.content === chunk.content) {
+      recycled.push({ chunk_idx: chunk.chunk_idx, content: chunk.content, embedding: existing.embedding });
+    } else {
+      toEmbed.push(chunk);
+    }
   }
 
-  // Build ChunkVector array
-  const chunkVectors: ChunkVector[] = chunks.map((chunk, i) => ({
+  let newEmbeddings: number[][] = [];
+  if (toEmbed.length > 0) {
+    try {
+      newEmbeddings = await embedBatch(toEmbed.map((c) => c.content));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        error: `Failed to generate embeddings via Ollama: ${message}`,
+        code: "EMBEDDING_ERROR",
+      };
+    }
+  }
+
+  const freshVectors: ChunkVector[] = toEmbed.map((chunk, i) => ({
     chunk_idx: chunk.chunk_idx,
     content: chunk.content,
-    embedding: embeddings[i],
+    embedding: newEmbeddings[i],
   }));
+
+  const allVectors = [...recycled, ...freshVectors].sort((a, b) => a.chunk_idx - b.chunk_idx);
 
   // Upsert into vector store
   try {
-    const db = getDb();
-    upsertPage(db, page, chunkVectors);
+    upsertPage(db, page, allVectors);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
@@ -151,10 +172,25 @@ export async function wikiUpdate(input: WikiUpdateInput): Promise<WikiUpdateResu
   // Invalidate BM25 index so it's rebuilt on next search
   invalidateIndex();
 
+  // Optional git commit
+  let gitCommitted: boolean | undefined;
+  if (git_commit) {
+    try {
+      execSync(`git add "${filePath}"`, { stdio: "pipe" });
+      const verb = existingVectors.length === 0 ? "create" : "update";
+      execSync(`git commit -m "wiki: ${verb} ${page}"`, { stdio: "pipe" });
+      gitCommitted = true;
+    } catch {
+      gitCommitted = false;
+    }
+  }
+
   return {
     success: true,
-    chunks_embedded: chunks.length,
+    chunks_embedded: toEmbed.length,
+    chunks_skipped: recycled.length,
     path: filePath,
+    ...(gitCommitted !== undefined ? { git_committed: gitCommitted } : {}),
     ...(missingLinks.length > 0 ? { missing_links: missingLinks } : {}),
   };
 }

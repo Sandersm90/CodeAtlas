@@ -11,22 +11,27 @@ export declare const WikiUpdateSchema: z.ZodObject<{
     content: z.ZodString;
     reason: z.ZodOptional<z.ZodString>;
     dry_run: z.ZodOptional<z.ZodBoolean>;
+    git_commit: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     content: string;
     page: string;
     reason?: string | undefined;
     dry_run?: boolean | undefined;
+    git_commit?: boolean | undefined;
 }, {
     content: string;
     page: string;
     reason?: string | undefined;
     dry_run?: boolean | undefined;
+    git_commit?: boolean | undefined;
 }>;
 export type WikiUpdateInput = z.infer<typeof WikiUpdateSchema>;
 export interface WikiUpdateSuccess {
     success: true;
     chunks_embedded: number;
+    chunks_skipped: number;
     path: string;
+    git_committed?: boolean;
     missing_links?: string[];
 }
 export interface WikiUpdateDryRun {

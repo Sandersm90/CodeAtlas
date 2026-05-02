@@ -12,16 +12,41 @@
  *   5. Missing concepts — capitalized noun phrases appearing 3+ times without a dedicated page
  */
 
-import { readAllPages, extractWikiLinks } from "../lib/wiki-fs";
+import { z } from "zod";
+import matter from "gray-matter";
+import * as fs from "fs";
+import { readAllPages, extractWikiLinks, resolvePage } from "../lib/wiki-fs";
 import { getPageEmbedTime } from "../lib/vector-store";
 import { getDb } from "../db";
 
+export const WikiLintSchema = z.object({
+  fix: z
+    .boolean()
+    .optional()
+    .describe("If true, auto-fix missing 'updated' frontmatter dates in place"),
+});
+
+export type WikiLintInput = z.infer<typeof WikiLintSchema>;
+
+export interface BrokenLink {
+  page: string;
+  link: string;
+  suggestion: string | null;
+}
+
+export interface FixedField {
+  page: string;
+  field: string;
+  value: string;
+}
+
 export interface WikiLintResult {
-  broken_links: Array<{ page: string; link: string }>;
+  broken_links: BrokenLink[];
   orphan_pages: string[];
   missing_frontmatter: Array<{ page: string; missing: string[] }>;
   stale_embeddings: string[];
   missing_concepts: string[];
+  fixed?: FixedField[];
 }
 
 export interface WikiLintError {
@@ -30,6 +55,39 @@ export interface WikiLintError {
 }
 
 export type WikiLintOutput = WikiLintResult | WikiLintError;
+
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function findClosestPage(link: string, pageNames: string[]): string | null {
+  if (pageNames.length === 0) return null;
+  const linkLower = link.toLowerCase();
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const name of pageNames) {
+    const dist = editDistance(linkLower, name.toLowerCase());
+    const maxLen = Math.max(link.length, name.length);
+    if (dist < bestDist && dist / maxLen < 0.4) {
+      bestDist = dist;
+      best = name;
+    }
+  }
+  return best;
+}
 
 /**
  * Extracts capitalized noun phrases (2+ word sequences or single capitalized words)
@@ -52,7 +110,9 @@ function extractConceptCandidates(text: string): string[] {
 /**
  * Handles the wiki_lint tool call.
  */
-export async function wikiLint(): Promise<WikiLintOutput> {
+export async function wikiLint(input: WikiLintInput = {}): Promise<WikiLintOutput> {
+  const { fix } = input;
+
   let pages;
   try {
     pages = await readAllPages();
@@ -65,45 +125,50 @@ export async function wikiLint(): Promise<WikiLintOutput> {
   }
 
   const pageNames = new Set(pages.map((p) => p.name));
+  const pageNameList = [...pageNames];
   const db = getDb();
 
-  // --- 1. Broken links ---
-  const brokenLinks: Array<{ page: string; link: string }> = [];
-
-  // --- 2. Orphan pages ---
-  // Track which pages are referenced (have incoming links)
+  const brokenLinks: BrokenLink[] = [];
   const referencedPages = new Set<string>();
-
-  // --- 3. Missing frontmatter ---
   const missingFrontmatter: Array<{ page: string; missing: string[] }> = [];
-
-  // --- 4. Stale embeddings ---
   const staleEmbeddings: string[] = [];
-
-  // --- 5. Concept frequency map ---
   const conceptFrequency = new Map<string, number>();
+  const fixed: FixedField[] = [];
+  const today = new Date().toISOString().split("T")[0];
 
   for (const page of pages) {
-    // Check broken links and track referenced pages
     const links = extractWikiLinks(page.content);
     for (const link of links) {
       referencedPages.add(link);
       if (!pageNames.has(link)) {
-        brokenLinks.push({ page: page.name, link });
+        brokenLinks.push({ page: page.name, link, suggestion: findClosestPage(link, pageNameList) });
       }
     }
 
-    // Check missing frontmatter fields
     const fm = page.frontmatter;
     const missing: string[] = [];
     if (!fm["title"]) missing.push("title");
     if (!fm["tags"]) missing.push("tags");
     if (!fm["updated"]) missing.push("updated");
+
+    // Auto-fix: write missing 'updated' date into frontmatter
+    if (fix && !fm["updated"]) {
+      try {
+        const parsed = matter(page.content);
+        parsed.data["updated"] = today;
+        const newContent = matter.stringify(parsed.content, parsed.data);
+        fs.writeFileSync(resolvePage(page.name), newContent, "utf-8");
+        fixed.push({ page: page.name, field: "updated", value: today });
+        missing.splice(missing.indexOf("updated"), 1);
+      } catch {
+        // non-fatal
+      }
+    }
+
     if (missing.length > 0) {
       missingFrontmatter.push({ page: page.name, missing });
     }
 
-    // Check stale embeddings
     const embedTime = getPageEmbedTime(db, page.name);
     if (fm["updated"] && typeof fm["updated"] === "string") {
       const updatedDate = new Date(fm["updated"] as string);
@@ -111,23 +176,19 @@ export async function wikiLint(): Promise<WikiLintOutput> {
         staleEmbeddings.push(page.name);
       }
     } else if (!embedTime) {
-      // No embeddings at all
       staleEmbeddings.push(page.name);
     }
 
-    // Collect concept candidates from page body
     const candidates = extractConceptCandidates(page.body);
     for (const candidate of candidates) {
       conceptFrequency.set(candidate, (conceptFrequency.get(candidate) ?? 0) + 1);
     }
   }
 
-  // Orphan pages: pages not referenced by any other page
   const orphanPages = pages
     .filter((p) => !referencedPages.has(p.name))
     .map((p) => p.name);
 
-  // Missing concepts: appear 3+ times but have no dedicated page
   const missingConcepts: string[] = [];
   for (const [concept, count] of conceptFrequency.entries()) {
     if (count >= 3 && !pageNames.has(concept)) {
@@ -142,5 +203,6 @@ export async function wikiLint(): Promise<WikiLintOutput> {
     missing_frontmatter: missingFrontmatter,
     stale_embeddings: staleEmbeddings,
     missing_concepts: missingConcepts,
+    ...(fixed.length > 0 ? { fixed } : {}),
   };
 }

@@ -13,6 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WikiUpdateSchema = void 0;
 exports.wikiUpdate = wikiUpdate;
 const zod_1 = require("zod");
+const child_process_1 = require("child_process");
 const gray_matter_1 = __importDefault(require("gray-matter"));
 const wiki_fs_1 = require("../lib/wiki-fs");
 const chunker_1 = require("../lib/chunker");
@@ -25,6 +26,7 @@ exports.WikiUpdateSchema = zod_1.z.object({
     content: zod_1.z.string().min(1).describe("Full markdown content including YAML frontmatter"),
     reason: zod_1.z.string().optional().describe("Brief description of why this page was updated"),
     dry_run: zod_1.z.boolean().optional().describe("If true, validate and diff without writing to disk or re-embedding"),
+    git_commit: zod_1.z.boolean().optional().describe("If true, run git add + git commit after writing the page"),
 });
 function diffLines(oldText, newText) {
     const oldLines = new Set(oldText.split("\n"));
@@ -43,7 +45,7 @@ function diffLines(oldText, newText) {
  * Handles the wiki_update tool call.
  */
 async function wikiUpdate(input) {
-    const { page, content, dry_run } = input;
+    const { page, content, dry_run, git_commit } = input;
     // Parse and validate frontmatter
     let parsed;
     try {
@@ -92,29 +94,43 @@ async function wikiUpdate(input) {
     }
     // Chunk the page body for embedding
     const chunks = (0, chunker_1.chunkPage)(page, parsed.content);
-    // Generate embeddings for all chunks
-    let embeddings;
-    try {
-        const texts = chunks.map((c) => c.content);
-        embeddings = await (0, embedder_1.embedBatch)(texts);
+    // Incremental embedding: reuse existing vectors for unchanged chunks
+    const db = (0, db_1.getDb)();
+    const existingVectors = (0, vector_store_1.getChunkVectorsForPage)(db, page);
+    const existingByIdx = new Map(existingVectors.map((v) => [v.chunk_idx, v]));
+    const toEmbed = [];
+    const recycled = [];
+    for (const chunk of chunks) {
+        const existing = existingByIdx.get(chunk.chunk_idx);
+        if (existing && existing.content === chunk.content) {
+            recycled.push({ chunk_idx: chunk.chunk_idx, content: chunk.content, embedding: existing.embedding });
+        }
+        else {
+            toEmbed.push(chunk);
+        }
     }
-    catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-            error: `Failed to generate embeddings via Ollama: ${message}`,
-            code: "EMBEDDING_ERROR",
-        };
+    let newEmbeddings = [];
+    if (toEmbed.length > 0) {
+        try {
+            newEmbeddings = await (0, embedder_1.embedBatch)(toEmbed.map((c) => c.content));
+        }
+        catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return {
+                error: `Failed to generate embeddings via Ollama: ${message}`,
+                code: "EMBEDDING_ERROR",
+            };
+        }
     }
-    // Build ChunkVector array
-    const chunkVectors = chunks.map((chunk, i) => ({
+    const freshVectors = toEmbed.map((chunk, i) => ({
         chunk_idx: chunk.chunk_idx,
         content: chunk.content,
-        embedding: embeddings[i],
+        embedding: newEmbeddings[i],
     }));
+    const allVectors = [...recycled, ...freshVectors].sort((a, b) => a.chunk_idx - b.chunk_idx);
     // Upsert into vector store
     try {
-        const db = (0, db_1.getDb)();
-        (0, vector_store_1.upsertPage)(db, page, chunkVectors);
+        (0, vector_store_1.upsertPage)(db, page, allVectors);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -125,10 +141,25 @@ async function wikiUpdate(input) {
     }
     // Invalidate BM25 index so it's rebuilt on next search
     (0, bm25_1.invalidateIndex)();
+    // Optional git commit
+    let gitCommitted;
+    if (git_commit) {
+        try {
+            (0, child_process_1.execSync)(`git add "${filePath}"`, { stdio: "pipe" });
+            const verb = existingVectors.length === 0 ? "create" : "update";
+            (0, child_process_1.execSync)(`git commit -m "wiki: ${verb} ${page}"`, { stdio: "pipe" });
+            gitCommitted = true;
+        }
+        catch {
+            gitCommitted = false;
+        }
+    }
     return {
         success: true,
-        chunks_embedded: chunks.length,
+        chunks_embedded: toEmbed.length,
+        chunks_skipped: recycled.length,
         path: filePath,
+        ...(gitCommitted !== undefined ? { git_committed: gitCommitted } : {}),
         ...(missingLinks.length > 0 ? { missing_links: missingLinks } : {}),
     };
 }

@@ -42,6 +42,39 @@ function serializeVector(vec: number[]): Buffer {
   return buffer;
 }
 
+function deserializeVector(buffer: Buffer): number[] {
+  const result: number[] = [];
+  for (let i = 0; i < buffer.length; i += 4) {
+    result.push(buffer.readFloatLE(i));
+  }
+  return result;
+}
+
+/**
+ * Returns all chunk vectors for a page, including content and embedding.
+ * Used for incremental re-embedding (skip unchanged chunks).
+ */
+export function getChunkVectorsForPage(
+  db: DB,
+  page: string
+): Array<{ chunk_idx: number; content: string; embedding: number[] }> {
+  const rows = db
+    .prepare(
+      `SELECT wc.chunk_idx, wc.content, wv.embedding
+       FROM wiki_chunks wc
+       JOIN wiki_vectors wv ON wv.rowid = wc.id
+       WHERE wc.page = ?
+       ORDER BY wc.chunk_idx ASC`
+    )
+    .all(page) as Array<{ chunk_idx: number; content: string; embedding: Buffer }>;
+
+  return rows.map((r) => ({
+    chunk_idx: r.chunk_idx,
+    content: r.content,
+    embedding: deserializeVector(r.embedding),
+  }));
+}
+
 /**
  * Reads the stored embedding dimension from an existing DB.
  * Returns null if the DB doesn't exist or has no stored dimension

@@ -25,6 +25,15 @@ export interface SearchResult {
     rowid: number;
 }
 /**
+ * Returns all chunk vectors for a page, including content and embedding.
+ * Used for incremental re-embedding (skip unchanged chunks).
+ */
+export declare function getChunkVectorsForPage(db: DB, page: string): Array<{
+    chunk_idx: number;
+    content: string;
+    embedding: number[];
+}>;
+/**
  * Reads the stored embedding dimension from an existing DB.
  * Returns null if the DB doesn't exist or has no stored dimension
  * (e.g. pre-1.1 DBs without wiki_meta).
