@@ -96,10 +96,14 @@ async function wikiUpdate(input) {
     }
     // Invalidate BM25 index so it's rebuilt on next search
     (0, bm25_1.invalidateIndex)();
+    // Warn about [[links]] that reference pages that don't exist yet
+    const referencedLinks = (0, wiki_fs_1.extractWikiLinks)(parsed.content);
+    const missingLinks = referencedLinks.filter((link) => !(0, wiki_fs_1.pageExists)(link));
     return {
         success: true,
         chunks_embedded: chunks.length,
         path: filePath,
+        ...(missingLinks.length > 0 ? { missing_links: missingLinks } : {}),
     };
 }
 //# sourceMappingURL=wiki-update.js.map

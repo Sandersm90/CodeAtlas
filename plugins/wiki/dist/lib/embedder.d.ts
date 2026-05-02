@@ -14,6 +14,11 @@ export interface EmbedderConfig {
  */
 export declare function embed(text: string): Promise<number[]>;
 /**
+ * Returns the embedding dimension for the configured model by embedding a
+ * single space and measuring the output length.
+ */
+export declare function getEmbeddingDimension(): Promise<number>;
+/**
  * Batch embeds multiple texts sequentially.
  * Runs one request at a time to respect Ollama rate limits.
  */

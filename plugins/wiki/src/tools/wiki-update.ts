@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import matter from "gray-matter";
-import { writePage, validateFrontmatter } from "../lib/wiki-fs";
+import { writePage, validateFrontmatter, extractWikiLinks, pageExists } from "../lib/wiki-fs";
 import { chunkPage } from "../lib/chunker";
 import { embedBatch } from "../lib/embedder";
 import { upsertPage, ChunkVector } from "../lib/vector-store";
@@ -27,6 +27,7 @@ export interface WikiUpdateSuccess {
   success: true;
   chunks_embedded: number;
   path: string;
+  missing_links?: string[];
 }
 
 export interface WikiUpdateError {
@@ -112,9 +113,14 @@ export async function wikiUpdate(input: WikiUpdateInput): Promise<WikiUpdateResu
   // Invalidate BM25 index so it's rebuilt on next search
   invalidateIndex();
 
+  // Warn about [[links]] that reference pages that don't exist yet
+  const referencedLinks = extractWikiLinks(parsed.content);
+  const missingLinks = referencedLinks.filter((link) => !pageExists(link));
+
   return {
     success: true,
     chunks_embedded: chunks.length,
     path: filePath,
+    ...(missingLinks.length > 0 ? { missing_links: missingLinks } : {}),
   };
 }

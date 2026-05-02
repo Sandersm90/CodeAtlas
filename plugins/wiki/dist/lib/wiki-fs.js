@@ -50,6 +50,9 @@ exports.listPages = listPages;
 exports.readAllPages = readAllPages;
 exports.validateFrontmatter = validateFrontmatter;
 exports.extractWikiLinks = extractWikiLinks;
+exports.deletePage = deletePage;
+exports.renamePage = renamePage;
+exports.rewriteLinksInAllPages = rewriteLinksInAllPages;
 exports.readRawFile = readRawFile;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -154,6 +157,62 @@ function extractWikiLinks(content) {
         links.push(match[1]);
     }
     return [...new Set(links)];
+}
+/**
+ * Deletes a wiki page from disk. Returns false if the page did not exist.
+ */
+function deletePage(pageName) {
+    const filePath = resolvePage(pageName);
+    if (!fs.existsSync(filePath))
+        return false;
+    fs.unlinkSync(filePath);
+    return true;
+}
+function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+/**
+ * Renames a wiki page on disk. If the frontmatter title exactly matches the
+ * old name it is updated to the new name. Returns the new file path.
+ */
+function renamePage(oldName, newName) {
+    const oldPath = resolvePage(oldName);
+    const newPath = resolvePage(newName);
+    if (!fs.existsSync(oldPath))
+        throw new Error(`Page "${oldName}" does not exist`);
+    if (fs.existsSync(newPath))
+        throw new Error(`Page "${newName}" already exists`);
+    let content = fs.readFileSync(oldPath, "utf-8");
+    const parsed = (0, gray_matter_1.default)(content);
+    if (parsed.data.title === oldName) {
+        parsed.data.title = newName;
+        content = gray_matter_1.default.stringify(parsed.content, parsed.data);
+    }
+    fs.writeFileSync(newPath, content, "utf-8");
+    fs.unlinkSync(oldPath);
+    return newPath;
+}
+/**
+ * Rewrites all [[oldName]] references to [[newName]] across every page in
+ * WIKI_ROOT. Returns the names of pages that were modified.
+ */
+function rewriteLinksInAllPages(oldName, newName) {
+    if (!fs.existsSync(config_1.config.wikiRoot))
+        return [];
+    const files = fs.readdirSync(config_1.config.wikiRoot).filter((f) => f.endsWith(".md"));
+    const modified = [];
+    const pattern = new RegExp(`\\[\\[${escapeRegex(oldName)}\\]\\]`, "g");
+    const replacement = `[[${newName}]]`;
+    for (const file of files) {
+        const filePath = path.join(config_1.config.wikiRoot, file);
+        const content = fs.readFileSync(filePath, "utf-8");
+        if (pattern.test(content)) {
+            pattern.lastIndex = 0;
+            fs.writeFileSync(filePath, content.replace(pattern, replacement), "utf-8");
+            modified.push(file.replace(/\.md$/, ""));
+        }
+    }
+    return modified;
 }
 /**
  * Reads a file from RAW_ROOT.

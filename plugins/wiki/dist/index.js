@@ -19,6 +19,8 @@ const wiki_search_1 = require("./tools/wiki-search");
 const wiki_update_1 = require("./tools/wiki-update");
 const wiki_ingest_1 = require("./tools/wiki-ingest");
 const wiki_lint_1 = require("./tools/wiki-lint");
+const wiki_delete_1 = require("./tools/wiki-delete");
+const wiki_rename_1 = require("./tools/wiki-rename");
 // Initialize DB at startup so errors surface early
 const db_1 = require("./db");
 /**
@@ -69,9 +71,9 @@ function zodToJsonSchema(schema) {
     };
 }
 async function main() {
-    // Ensure DB is initialized (surfaces errors immediately, not on first tool call)
+    // Initialize DB (detects embedding dim from Ollama if needed)
     try {
-        (0, db_1.getDb)();
+        await (0, db_1.initializeDb)();
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -118,6 +120,16 @@ async function main() {
                         properties: {},
                     },
                 },
+                {
+                    name: "wiki_delete",
+                    description: "Delete a wiki page and remove its vectors from the database.",
+                    inputSchema: zodToJsonSchema(wiki_delete_1.WikiDeleteSchema),
+                },
+                {
+                    name: "wiki_rename",
+                    description: "Rename a wiki page and atomically rewrite all [[links]] pointing to it across every page in the wiki.",
+                    inputSchema: zodToJsonSchema(wiki_rename_1.WikiRenameSchema),
+                },
             ],
         };
     });
@@ -148,6 +160,16 @@ async function main() {
                 }
                 case "wiki_lint": {
                     const result = await (0, wiki_lint_1.wikiLint)();
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                }
+                case "wiki_delete": {
+                    const input = wiki_delete_1.WikiDeleteSchema.parse(args);
+                    const result = await (0, wiki_delete_1.wikiDelete)(input);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                }
+                case "wiki_rename": {
+                    const input = wiki_rename_1.WikiRenameSchema.parse(args);
+                    const result = await (0, wiki_rename_1.wikiRename)(input);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 }
                 default:

@@ -148,6 +148,68 @@ export function extractWikiLinks(content: string): string[] {
 }
 
 /**
+ * Deletes a wiki page from disk. Returns false if the page did not exist.
+ */
+export function deletePage(pageName: string): boolean {
+  const filePath = resolvePage(pageName);
+  if (!fs.existsSync(filePath)) return false;
+  fs.unlinkSync(filePath);
+  return true;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Renames a wiki page on disk. If the frontmatter title exactly matches the
+ * old name it is updated to the new name. Returns the new file path.
+ */
+export function renamePage(oldName: string, newName: string): string {
+  const oldPath = resolvePage(oldName);
+  const newPath = resolvePage(newName);
+
+  if (!fs.existsSync(oldPath)) throw new Error(`Page "${oldName}" does not exist`);
+  if (fs.existsSync(newPath)) throw new Error(`Page "${newName}" already exists`);
+
+  let content = fs.readFileSync(oldPath, "utf-8");
+  const parsed = matter(content);
+  if (parsed.data.title === oldName) {
+    parsed.data.title = newName;
+    content = matter.stringify(parsed.content, parsed.data);
+  }
+
+  fs.writeFileSync(newPath, content, "utf-8");
+  fs.unlinkSync(oldPath);
+  return newPath;
+}
+
+/**
+ * Rewrites all [[oldName]] references to [[newName]] across every page in
+ * WIKI_ROOT. Returns the names of pages that were modified.
+ */
+export function rewriteLinksInAllPages(oldName: string, newName: string): string[] {
+  if (!fs.existsSync(config.wikiRoot)) return [];
+
+  const files = fs.readdirSync(config.wikiRoot).filter((f) => f.endsWith(".md"));
+  const modified: string[] = [];
+  const pattern = new RegExp(`\\[\\[${escapeRegex(oldName)}\\]\\]`, "g");
+  const replacement = `[[${newName}]]`;
+
+  for (const file of files) {
+    const filePath = path.join(config.wikiRoot, file);
+    const content = fs.readFileSync(filePath, "utf-8");
+    if (pattern.test(content)) {
+      pattern.lastIndex = 0;
+      fs.writeFileSync(filePath, content.replace(pattern, replacement), "utf-8");
+      modified.push(file.replace(/\.md$/, ""));
+    }
+  }
+
+  return modified;
+}
+
+/**
  * Reads a file from RAW_ROOT.
  */
 export function readRawFile(filename: string): string {

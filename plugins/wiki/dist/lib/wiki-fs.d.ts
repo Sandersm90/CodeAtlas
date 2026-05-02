@@ -54,6 +54,20 @@ export declare function validateFrontmatter(frontmatter: FrontmatterData): strin
  */
 export declare function extractWikiLinks(content: string): string[];
 /**
+ * Deletes a wiki page from disk. Returns false if the page did not exist.
+ */
+export declare function deletePage(pageName: string): boolean;
+/**
+ * Renames a wiki page on disk. If the frontmatter title exactly matches the
+ * old name it is updated to the new name. Returns the new file path.
+ */
+export declare function renamePage(oldName: string, newName: string): string;
+/**
+ * Rewrites all [[oldName]] references to [[newName]] across every page in
+ * WIKI_ROOT. Returns the names of pages that were modified.
+ */
+export declare function rewriteLinksInAllPages(oldName: string, newName: string): string[];
+/**
  * Reads a file from RAW_ROOT.
  */
 export declare function readRawFile(filename: string): string;

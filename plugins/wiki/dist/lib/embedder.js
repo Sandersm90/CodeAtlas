@@ -7,6 +7,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.embed = embed;
+exports.getEmbeddingDimension = getEmbeddingDimension;
 exports.embedBatch = embedBatch;
 const config_1 = require("../config");
 /**
@@ -36,6 +37,14 @@ async function embed(text) {
         throw new Error(`Ollama returned unexpected response: missing "embedding" array`);
     }
     return data.embedding;
+}
+/**
+ * Returns the embedding dimension for the configured model by embedding a
+ * single space and measuring the output length.
+ */
+async function getEmbeddingDimension() {
+    const vec = await embed(" ");
+    return vec.length;
 }
 /**
  * Batch embeds multiple texts sequentially.

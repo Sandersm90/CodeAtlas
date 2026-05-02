@@ -5,8 +5,9 @@
  * Wraps better-sqlite3 + sqlite-vec for vector storage and similarity search.
  *
  * Schema:
+ *   wiki_meta(key, value)            — server metadata (embedding_dim, etc.)
  *   wiki_chunks(id, page, chunk_idx, content, embedded_at)
- *   wiki_vectors USING vec0(embedding FLOAT[768])
+ *   wiki_vectors USING vec0(embedding FLOAT[N])  — N detected from Ollama
  *
  * wiki_chunks.rowid maps 1:1 to wiki_vectors.rowid.
  */
@@ -47,10 +48,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStoredDimension = getStoredDimension;
 exports.initDb = initDb;
+exports.deletePageVectors = deletePageVectors;
+exports.renamePageVectors = renamePageVectors;
 exports.upsertPage = upsertPage;
 exports.searchSimilar = searchSimilar;
 exports.getPageEmbedTime = getPageEmbedTime;
+const fs_1 = require("fs");
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const sqliteVec = __importStar(require("sqlite-vec"));
 /**
@@ -64,15 +69,54 @@ function serializeVector(vec) {
     return buffer;
 }
 /**
- * Initializes the SQLite database and creates tables/virtual tables if needed.
+ * Reads the stored embedding dimension from an existing DB.
+ * Returns null if the DB doesn't exist or has no stored dimension
+ * (e.g. pre-1.1 DBs without wiki_meta).
  */
-function initDb(dbPath) {
+function getStoredDimension(dbPath) {
+    if (!(0, fs_1.existsSync)(dbPath))
+        return null;
+    let db = null;
+    try {
+        db = new better_sqlite3_1.default(dbPath, { readonly: true });
+        const tableExists = db
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='wiki_meta'")
+            .get();
+        if (!tableExists)
+            return null;
+        const row = db
+            .prepare("SELECT value FROM wiki_meta WHERE key = 'embedding_dim'")
+            .get();
+        return row ? parseInt(row.value, 10) : null;
+    }
+    catch {
+        return null;
+    }
+    finally {
+        db?.close();
+    }
+}
+/**
+ * Initializes the SQLite database and creates tables/virtual tables if needed.
+ * embeddingDim is detected at startup from Ollama — not hardcoded.
+ */
+function initDb(dbPath, embeddingDim) {
     const db = new better_sqlite3_1.default(dbPath);
     // Load sqlite-vec extension
     sqliteVec.load(db);
     // Enable WAL for better concurrent read performance
     db.pragma("journal_mode = WAL");
     db.pragma("synchronous = NORMAL");
+    // Metadata table — stores embedding_dim and other server-side config
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS wiki_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+    // Store dimension on first creation; no-op on subsequent starts
+    db.prepare("INSERT OR IGNORE INTO wiki_meta (key, value) VALUES ('embedding_dim', ?)")
+        .run(String(embeddingDim));
     // Create wiki_chunks table
     db.exec(`
     CREATE TABLE IF NOT EXISTS wiki_chunks (
@@ -83,14 +127,33 @@ function initDb(dbPath) {
       embedded_at TEXT NOT NULL
     );
   `);
-    // Create sqlite-vec virtual table for embeddings
-    // FLOAT[768] matches nomic-embed-text output dimension
+    // Create sqlite-vec virtual table — dimension comes from Ollama model info
     db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS wiki_vectors USING vec0(
-      embedding FLOAT[768]
+      embedding FLOAT[${embeddingDim}]
     );
   `);
     return db;
+}
+/**
+ * Deletes all chunks and vectors for a page.
+ */
+function deletePageVectors(db, page) {
+    const existingIds = db
+        .prepare("SELECT id FROM wiki_chunks WHERE page = ?")
+        .all(page);
+    if (existingIds.length > 0) {
+        const ids = existingIds.map((r) => BigInt(r.id));
+        const placeholders = ids.map(() => "?").join(", ");
+        db.prepare(`DELETE FROM wiki_vectors WHERE rowid IN (${placeholders})`).run(...ids);
+        db.prepare("DELETE FROM wiki_chunks WHERE page = ?").run(page);
+    }
+}
+/**
+ * Renames a page in the chunks table (vectors stay valid — content unchanged).
+ */
+function renamePageVectors(db, oldPage, newPage) {
+    db.prepare("UPDATE wiki_chunks SET page = ? WHERE page = ?").run(newPage, oldPage);
 }
 /**
  * Upserts all chunk vectors for a page.

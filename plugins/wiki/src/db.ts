@@ -2,20 +2,39 @@
  * db.ts
  *
  * Singleton database instance.
- * Initialized once at server startup, shared across all tool calls.
+ * Call initializeDb() once at startup (async — queries Ollama for dim if needed).
+ * All tool calls use getDb() which is synchronous after initialization.
  */
 
-import { initDb, DB } from "./lib/vector-store";
+import { initDb, getStoredDimension, DB } from "./lib/vector-store";
+import { getEmbeddingDimension } from "./lib/embedder";
 import { config } from "./config";
 
 let db: DB | null = null;
 
 /**
- * Returns the shared database instance, initializing it if necessary.
+ * Async init: reads stored embedding dim or detects it from Ollama.
+ * Must be awaited before getDb() is called.
+ */
+export async function initializeDb(): Promise<DB> {
+  if (db) return db;
+
+  const storedDim = getStoredDimension(config.dbPath);
+  const dim = storedDim ?? await getEmbeddingDimension();
+
+  db = initDb(config.dbPath, dim);
+
+  console.error(
+    `[wiki-mcp] DB initialized. embedding_dim=${dim}${storedDim === null ? " (detected from model)" : " (from DB)"}`
+  );
+
+  return db;
+}
+
+/**
+ * Returns the shared database instance. Throws if initializeDb() was not called.
  */
 export function getDb(): DB {
-  if (!db) {
-    db = initDb(config.dbPath);
-  }
+  if (!db) throw new Error("[wiki-mcp] DB not initialized — call initializeDb() first");
   return db;
 }

@@ -56,6 +56,15 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 /**
+ * Returns the embedding dimension for the configured model by embedding a
+ * single space and measuring the output length.
+ */
+export async function getEmbeddingDimension(): Promise<number> {
+  const vec = await embed(" ");
+  return vec.length;
+}
+
+/**
  * Batch embeds multiple texts sequentially.
  * Runs one request at a time to respect Ollama rate limits.
  */

@@ -24,6 +24,7 @@ export interface WikiUpdateSuccess {
     success: true;
     chunks_embedded: number;
     path: string;
+    missing_links?: string[];
 }
 export interface WikiUpdateError {
     error: string;

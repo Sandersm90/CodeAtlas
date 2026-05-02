@@ -4,8 +4,9 @@
  * Wraps better-sqlite3 + sqlite-vec for vector storage and similarity search.
  *
  * Schema:
+ *   wiki_meta(key, value)            — server metadata (embedding_dim, etc.)
  *   wiki_chunks(id, page, chunk_idx, content, embedded_at)
- *   wiki_vectors USING vec0(embedding FLOAT[768])
+ *   wiki_vectors USING vec0(embedding FLOAT[N])  — N detected from Ollama
  *
  * wiki_chunks.rowid maps 1:1 to wiki_vectors.rowid.
  */
@@ -24,9 +25,24 @@ export interface SearchResult {
     rowid: number;
 }
 /**
- * Initializes the SQLite database and creates tables/virtual tables if needed.
+ * Reads the stored embedding dimension from an existing DB.
+ * Returns null if the DB doesn't exist or has no stored dimension
+ * (e.g. pre-1.1 DBs without wiki_meta).
  */
-export declare function initDb(dbPath: string): DB;
+export declare function getStoredDimension(dbPath: string): number | null;
+/**
+ * Initializes the SQLite database and creates tables/virtual tables if needed.
+ * embeddingDim is detected at startup from Ollama — not hardcoded.
+ */
+export declare function initDb(dbPath: string, embeddingDim: number): DB;
+/**
+ * Deletes all chunks and vectors for a page.
+ */
+export declare function deletePageVectors(db: DB, page: string): void;
+/**
+ * Renames a page in the chunks table (vectors stay valid — content unchanged).
+ */
+export declare function renamePageVectors(db: DB, oldPage: string, newPage: string): void;
 /**
  * Upserts all chunk vectors for a page.
  * Deletes existing chunks for the page first (full replacement).

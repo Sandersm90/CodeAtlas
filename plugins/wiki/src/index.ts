@@ -22,9 +22,11 @@ import { wikiSearch, WikiSearchSchema } from "./tools/wiki-search";
 import { wikiUpdate, WikiUpdateSchema } from "./tools/wiki-update";
 import { wikiIngest, WikiIngestSchema } from "./tools/wiki-ingest";
 import { wikiLint } from "./tools/wiki-lint";
+import { wikiDelete, WikiDeleteSchema } from "./tools/wiki-delete";
+import { wikiRename, WikiRenameSchema } from "./tools/wiki-rename";
 
 // Initialize DB at startup so errors surface early
-import { getDb } from "./db";
+import { initializeDb, getDb } from "./db";
 
 /**
  * Converts a Zod schema to a JSON Schema object suitable for MCP tool definitions.
@@ -84,9 +86,9 @@ function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unk
 }
 
 async function main(): Promise<void> {
-  // Ensure DB is initialized (surfaces errors immediately, not on first tool call)
+  // Initialize DB (detects embedding dim from Ollama if needed)
   try {
-    getDb();
+    await initializeDb();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[wiki-mcp] Failed to initialize database at "${config.dbPath}": ${message}`);
@@ -142,6 +144,18 @@ async function main(): Promise<void> {
             properties: {},
           },
         },
+        {
+          name: "wiki_delete",
+          description:
+            "Delete a wiki page and remove its vectors from the database.",
+          inputSchema: zodToJsonSchema(WikiDeleteSchema),
+        },
+        {
+          name: "wiki_rename",
+          description:
+            "Rename a wiki page and atomically rewrite all [[links]] pointing to it across every page in the wiki.",
+          inputSchema: zodToJsonSchema(WikiRenameSchema),
+        },
       ],
     };
   });
@@ -178,6 +192,18 @@ async function main(): Promise<void> {
 
         case "wiki_lint": {
           const result = await wikiLint();
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_delete": {
+          const input = WikiDeleteSchema.parse(args);
+          const result = await wikiDelete(input);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "wiki_rename": {
+          const input = WikiRenameSchema.parse(args);
+          const result = await wikiRename(input);
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
 
