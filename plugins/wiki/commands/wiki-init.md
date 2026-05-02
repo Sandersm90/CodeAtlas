@@ -18,8 +18,8 @@ in order and confirm each one:
    {
      "mcpServers": {
        "wiki": {
-         "command": "node",
-         "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"],
+         "command": "npx",
+         "args": ["-y", "@synnode/codeatlas"],
          "env": {
            "WIKI_ROOT": "PROJECT_PATH/wiki",
            "RAW_ROOT": "PROJECT_PATH/raw",

@@ -1,12 +1,21 @@
 {
-  "name": "wiki-mcp",
-  "version": "1.0.0",
+  "name": "@synnode/codeatlas",
+  "version": "1.1.0",
   "description": "MCP server for per-project markdown knowledge base with semantic + keyword search",
   "main": "dist/index.js",
+  "bin": {
+    "codeatlas": "./dist/index.js"
+  },
+  "files": [
+    "dist/**",
+    "scripts/**",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/postbuild.js",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "latest",
@@ -23,6 +32,11 @@
     "@types/node": "^20.14.0",
     "typescript": "^5.5.3"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/synnode/codeatlas.git"
+  },
+  "homepage": "https://github.com/synnode/codeatlas#readme",
   "engines": {
     "node": ">=18.0.0"
   }

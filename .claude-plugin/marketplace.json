@@ -3,8 +3,8 @@
   "name": "codeatlas",
   "description": "Claude Code plugins for project knowledge management",
   "owner": {
-    "name": "Sandersm90",
-    "url": "https://github.com/Sandersm90"
+    "name": "synnode",
+    "url": "https://github.com/synnode"
   },
   "plugins": [
     {
