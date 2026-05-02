@@ -19,7 +19,7 @@ in order and confirm each one:
      "mcpServers": {
        "wiki": {
          "command": "node",
-         "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+         "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"],
          "env": {
            "WIKI_ROOT": "PROJECT_PATH/wiki",
            "RAW_ROOT": "PROJECT_PATH/raw",
