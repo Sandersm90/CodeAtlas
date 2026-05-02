@@ -11,6 +11,5 @@
   "license": "MIT",
   "keywords": ["wiki", "knowledge-base", "semantic-search", "ollama", "mcp"],
   "commands": "./commands",
-  "skills": "./skills",
-  "mcpServers": "./mcp.json"
+  "skills": "./skills"
 }

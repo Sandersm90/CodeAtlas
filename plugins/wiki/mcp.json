@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "wiki": {
-      "type": "stdio",
-      "command": "codeatlas",
-      "args": []
-    }
-  }
-}
