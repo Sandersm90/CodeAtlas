@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "codeatlas",
+  "description": "Claude Code plugins for project knowledge management",
+  "owner": {
+    "name": "Sandersm90",
+    "url": "https://github.com/Sandersm90"
+  },
+  "plugins": [
+    {
+      "name": "wiki",
+      "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
+      "source": "./plugins/wiki",
+      "category": "productivity"
+    }
+  ]
+}
