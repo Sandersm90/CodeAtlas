@@ -104,7 +104,7 @@ async function runInit(args) {
                 wiki: {
                     type: "stdio",
                     command: "npx",
-                    args: ["-y", "@synnode/codeatlas"],
+                    args: ["--package=@synnode/codeatlas", "--yes", "codeatlas"],
                     env: {
                         WIKI_ROOT: opts.wikiRoot,
                         RAW_ROOT: opts.rawRoot,
