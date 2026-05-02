@@ -76,6 +76,7 @@ export async function runInit(args: string[]): Promise<void> {
     const config = {
       mcpServers: {
         wiki: {
+          type: "stdio",
           command: "npx",
           args: ["-y", "@synnode/codeatlas"],
           env: {
