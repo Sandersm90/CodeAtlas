@@ -49,6 +49,7 @@ claude plugin install github:synnode/codeatlas
 | `wiki_lint` | Health check: broken links, orphans, stale embeddings |
 | `wiki_delete` | Delete a page and remove its vectors |
 | `wiki_rename` | Rename a page and rewrite all `[[links]]` across the wiki |
+| `wiki_context_for` | Given a source file, auto-detect relevant wiki pages from filename + symbols |
 
 ## Wiki page format
 
