@@ -86,21 +86,21 @@ async function wikiSearch(input) {
     }
     // Hybrid: run both searches and combine with RRF
     const fetchCount = filterLimit * 3;
-    let queryVec;
+    let queryVec = null;
     try {
         queryVec = await (0, embedder_1.embed)(query);
     }
-    catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
+    catch {
+        // Ollama unavailable — fall back to keyword-only
     }
-    let semResults;
-    try {
-        semResults = (0, vector_store_1.searchSimilar)(db, queryVec, fetchCount);
-    }
-    catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { error: `Vector search failed: ${message}`, code: "SEARCH_ERROR" };
+    let semResults = [];
+    if (queryVec !== null) {
+        try {
+            semResults = (0, vector_store_1.searchSimilar)(db, queryVec, fetchCount);
+        }
+        catch {
+            // non-fatal — proceed with keyword results only
+        }
     }
     let kwResults;
     try {
@@ -109,6 +109,17 @@ async function wikiSearch(input) {
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
+    }
+    if (semResults.length === 0) {
+        // Semantic unavailable — return keyword results directly
+        return {
+            results: await applyTagFilter(kwResults.map((r) => ({
+                page: r.page,
+                excerpt: r.excerpt,
+                score: r.score,
+                path: r.path,
+            }))),
+        };
     }
     const combined = (0, rrf_1.reciprocalRankFusion)(semResults, kwResults, 60, filterLimit);
     return {

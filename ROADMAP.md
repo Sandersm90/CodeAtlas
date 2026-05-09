@@ -1,36 +1,47 @@
 # CodeAtlas Roadmap
 
-## v1.1 — Polish & robustness
+## ✅ v1.1 — Polish & robustness
 
-- **Auto-detect embedding dimensions** — query Ollama for model info instead of hardcoding `FLOAT[768]`; allows swapping models without DB rebuild
-- **`wiki_delete` tool** — remove a page + its vectors; currently orphans the DB rows
-- **`wiki_rename` tool** — rename page + rewrite all incoming `[[links]]` in one atomic op
-- **Validate links on write** — `wiki_update` warns when content references `[[PageName]]` that doesn't exist yet
-- **PostInstall hook** — run `npm install + rebuild` automatically on plugin install/update so `start.sh` workaround becomes unnecessary
+- Auto-detect embedding dimensions — query Ollama for model info instead of hardcoding `FLOAT[768]`
+- `wiki_delete` tool — remove a page + its vectors
+- `wiki_rename` tool — rename page + rewrite all incoming `[[links]]` in one atomic op
+- Validate links on write — `wiki_update` warns when content references `[[PageName]]` that doesn't exist yet
+- PostInstall hook — run `npm install + rebuild` automatically on plugin install/update
 
-## v1.2 — Code-aware context
+## ✅ v1.2 — Code-aware context
 
-- **`wiki_context_for(file)` tool** — given a source file path, extracts filename + symbols and returns the most relevant wiki pages automatically; removes the need for Claude to manually guess search keywords when opening a file
-- **`wiki_diff` tool** — show what would change before committing a `wiki_update`; surfaces as `wiki_update({ dry_run: true })` so it fits the existing tool rather than adding a separate call
-- **Tag filtering** — `wiki_search({ query, tags: ["auth", "mqtt"] })` to scope results
-- **`wiki_list` tool** — enumerate all pages with title, tags, updated date; useful for getting a map before deep search
+- `wiki_context_for(file)` tool — given a source file path, extracts filename + symbols and returns the most relevant wiki pages automatically
+- `wiki_update({ dry_run: true })` — preview changes without writing
+- Tag filtering — `wiki_search({ query, tags: ["auth", "mqtt"] })` to scope results
+- `wiki_list` tool — enumerate all pages with title, tags, updated date
 
-## v1.3 — Ingest pipeline
+## ✅ v1.3 — Ingest pipeline
 
-- **Batch ingest** — `wiki_ingest({ files: ["a.md", "b.md"] })` processes multiple files in one call
-- **Ingest from URL** — fetch a web page or GitHub file and ingest directly
-- **Ingest deduplication** — before writing, check if ingest content overlaps significantly with existing page (cosine sim threshold)
+- Batch ingest — `wiki_ingest({ files: ["a.md", "b.md"] })` processes multiple files in one call
+- Ingest from URL — fetch a web page or GitHub file and ingest directly
+- Ingest deduplication — before writing, check cosine sim against existing pages
 
-## v1.4 — Maintenance tooling
+## ✅ v1.4 — Maintenance tooling
 
-- **`wiki_lint --fix`** — auto-fix simple issues: missing `updated` date, broken link suggestions based on fuzzy page name match
-- **`wiki_reembed_all`** — batch re-embed all stale pages in one call
-- **Git integration** — optionally `git add + commit` wiki pages after `wiki_update` with auto-generated commit message
-- **Incremental re-embedding** — only re-embed chunks whose content changed, not full page replacement
+- `wiki_lint --fix` — auto-fix simple issues: missing `updated` date, broken link suggestions
+- `wiki_reembed_all` — batch re-embed all stale pages in one call
+- Git integration — optionally `git add + commit` wiki pages after `wiki_update`
+- Incremental re-embedding — only re-embed chunks whose content changed
 
-## Backlog / nice to have
+## ✅ v1.5 — Robustness & quality
 
-- **Obsidian-compatible graph export** — frontmatter + `[[links]]` already compatible; add JSON adjacency list export for visualization
-- **Multi-wiki support** — single MCP server instance serving multiple `WIKI_ROOT` paths (monorepos)
+- Ollama fallback — hybrid search degrades to TF-IDF-only when Ollama is unavailable
+- Ingest context — picks semantically relevant existing pages as context (was: first N pages)
+- Raw file truncation — large sources capped at 40k chars to prevent context overflow
+- Security — `execSync` → `execFileSync` to eliminate shell injection in `git_commit` path
+- Schema — replace custom `zodToJsonSchema` with `zod-to-json-schema` (array `items` now correct)
+- Release script — atomic version bump across `package.json` + `plugin.json`, build, tag, publish
+
+## Backlog / next
+
 - **OpenAI / local embedding fallback** — configurable embedding provider, not Ollama-only
-- **`/wiki-update` slash command** — convenience wrapper around the `wiki_update` MCP tool
+- **Obsidian-compatible graph export** — JSON adjacency list for `[[link]]` visualization
+- **Multi-wiki support** — single MCP server serving multiple `WIKI_ROOT` paths (monorepos)
+- **`/wiki-update` slash command** — convenience wrapper around `wiki_update` MCP tool
+- **Watch mode** — auto-ingest on file change in `RAW_ROOT`
+- **Page templates** — frontmatter scaffolding for common page types

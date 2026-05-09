@@ -4,7 +4,7 @@
   "description": "MCP server for per-project markdown knowledge base with semantic + keyword search",
   "main": "dist/index.js",
   "bin": {
-    "codeatlas": "./dist/cli.js"
+    "codeatlas": "dist/cli.js"
   },
   "files": [
     "dist/**",
@@ -39,7 +39,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/synnode/codeatlas.git"
+    "url": "git+https://github.com/synnode/codeatlas.git"
   },
   "homepage": "https://github.com/synnode/codeatlas#readme",
   "engines": {

@@ -106,6 +106,7 @@ export interface WikiIngestError {
 export type WikiIngestResult = WikiIngestPayload | WikiIngestError;
 
 const MAX_CONTEXT_PAGES = 5;
+const MAX_RAW_CHARS = 40_000; // ~10k tokens; truncate to avoid context overflow
 
 export async function wikiIngest(input: WikiIngestInput): Promise<WikiIngestResult> {
   const { file, files, url, urls, hint } = input;
@@ -115,9 +116,14 @@ export async function wikiIngest(input: WikiIngestInput): Promise<WikiIngestResu
 
   const rawFiles: Record<string, string> = {};
 
+  const truncate = (content: string): string =>
+    content.length > MAX_RAW_CHARS
+      ? content.slice(0, MAX_RAW_CHARS) + `\n\n[truncated — ${content.length} chars total, showing first ${MAX_RAW_CHARS}]`
+      : content;
+
   for (const f of filesToProcess) {
     try {
-      rawFiles[f] = readRawFile(f);
+      rawFiles[f] = truncate(readRawFile(f));
     } catch (err) {
       return {
         error: `Failed to read raw file "${f}": ${err instanceof Error ? err.message : String(err)}`,
@@ -129,7 +135,7 @@ export async function wikiIngest(input: WikiIngestInput): Promise<WikiIngestResu
 
   for (const u of urlsToProcess) {
     try {
-      rawFiles[u] = await fetchUrlContent(u);
+      rawFiles[u] = truncate(await fetchUrlContent(u));
     } catch (err) {
       return {
         error: `Failed to fetch URL "${u}": ${err instanceof Error ? err.message : String(err)}`,
@@ -146,10 +152,27 @@ export async function wikiIngest(input: WikiIngestInput): Promise<WikiIngestResu
     // non-fatal
   }
 
+  // Pick the most semantically relevant existing pages as context for Claude.
+  // Falls back to first N pages if Ollama is unavailable.
   const existingPageContents: Record<string, string> = {};
-  for (const pageName of existingPages.slice(0, MAX_CONTEXT_PAGES)) {
-    const page = readPage(pageName);
-    if (page) existingPageContents[pageName] = page.content;
+  try {
+    const db = getDb();
+    const allContent = Object.values(rawFiles).join("\n").slice(0, 1000);
+    const vec = await embed(allContent);
+    const relevant = searchSimilar(db, vec, MAX_CONTEXT_PAGES);
+    const seen = new Set<string>();
+    for (const r of relevant) {
+      if (seen.has(r.page)) continue;
+      seen.add(r.page);
+      const page = readPage(r.page);
+      if (page) existingPageContents[r.page] = page.content;
+    }
+  } catch {
+    // Ollama unavailable — fall back to first N pages
+    for (const pageName of existingPages.slice(0, MAX_CONTEXT_PAGES)) {
+      const page = readPage(pageName);
+      if (page) existingPageContents[pageName] = page.content;
+    }
   }
 
   // Deduplication: embed a sample of each source, find similar existing pages

@@ -72,14 +72,18 @@ async function fetchUrlContent(url) {
     return text;
 }
 const MAX_CONTEXT_PAGES = 5;
+const MAX_RAW_CHARS = 40_000; // ~10k tokens; truncate to avoid context overflow
 async function wikiIngest(input) {
     const { file, files, url, urls, hint } = input;
     const filesToProcess = [...(files ?? []), ...(file ? [file] : [])];
     const urlsToProcess = [...(urls ?? []), ...(url ? [url] : [])];
     const rawFiles = {};
+    const truncate = (content) => content.length > MAX_RAW_CHARS
+        ? content.slice(0, MAX_RAW_CHARS) + `\n\n[truncated — ${content.length} chars total, showing first ${MAX_RAW_CHARS}]`
+        : content;
     for (const f of filesToProcess) {
         try {
-            rawFiles[f] = (0, wiki_fs_1.readRawFile)(f);
+            rawFiles[f] = truncate((0, wiki_fs_1.readRawFile)(f));
         }
         catch (err) {
             return {
@@ -91,7 +95,7 @@ async function wikiIngest(input) {
     }
     for (const u of urlsToProcess) {
         try {
-            rawFiles[u] = await fetchUrlContent(u);
+            rawFiles[u] = truncate(await fetchUrlContent(u));
         }
         catch (err) {
             return {
@@ -108,11 +112,31 @@ async function wikiIngest(input) {
     catch {
         // non-fatal
     }
+    // Pick the most semantically relevant existing pages as context for Claude.
+    // Falls back to first N pages if Ollama is unavailable.
     const existingPageContents = {};
-    for (const pageName of existingPages.slice(0, MAX_CONTEXT_PAGES)) {
-        const page = (0, wiki_fs_1.readPage)(pageName);
-        if (page)
-            existingPageContents[pageName] = page.content;
+    try {
+        const db = (0, db_1.getDb)();
+        const allContent = Object.values(rawFiles).join("\n").slice(0, 1000);
+        const vec = await (0, embedder_1.embed)(allContent);
+        const relevant = (0, vector_store_1.searchSimilar)(db, vec, MAX_CONTEXT_PAGES);
+        const seen = new Set();
+        for (const r of relevant) {
+            if (seen.has(r.page))
+                continue;
+            seen.add(r.page);
+            const page = (0, wiki_fs_1.readPage)(r.page);
+            if (page)
+                existingPageContents[r.page] = page.content;
+        }
+    }
+    catch {
+        // Ollama unavailable — fall back to first N pages
+        for (const pageName of existingPages.slice(0, MAX_CONTEXT_PAGES)) {
+            const page = (0, wiki_fs_1.readPage)(pageName);
+            if (page)
+                existingPageContents[pageName] = page.content;
+        }
     }
     // Deduplication: embed a sample of each source, find similar existing pages
     const DEDUP_THRESHOLD = 0.75;

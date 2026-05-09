@@ -111,20 +111,20 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
   // Hybrid: run both searches and combine with RRF
   const fetchCount = filterLimit * 3;
 
-  let queryVec: number[];
+  let queryVec: number[] | null = null;
   try {
     queryVec = await embed(query);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { error: `Failed to embed query via Ollama: ${message}`, code: "EMBEDDING_ERROR" };
+  } catch {
+    // Ollama unavailable — fall back to keyword-only
   }
 
-  let semResults;
-  try {
-    semResults = searchSimilar(db, queryVec, fetchCount);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { error: `Vector search failed: ${message}`, code: "SEARCH_ERROR" };
+  let semResults: Awaited<ReturnType<typeof searchSimilar>> = [];
+  if (queryVec !== null) {
+    try {
+      semResults = searchSimilar(db, queryVec, fetchCount);
+    } catch {
+      // non-fatal — proceed with keyword results only
+    }
   }
 
   let kwResults;
@@ -133,6 +133,18 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
+  }
+
+  if (semResults.length === 0) {
+    // Semantic unavailable — return keyword results directly
+    return {
+      results: await applyTagFilter(kwResults.map((r) => ({
+        page: r.page,
+        excerpt: r.excerpt,
+        score: r.score,
+        path: r.path,
+      }))),
+    };
   }
 
   const combined: CombinedResult[] = reciprocalRankFusion(semResults, kwResults, 60, filterLimit);
