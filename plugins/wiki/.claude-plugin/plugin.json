@@ -1,7 +1,7 @@
 {
   "name": "wiki",
   "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "author": {
     "name": "Synnode",
     "email": "michael@fruitcake.nl"
@@ -9,7 +9,13 @@
   "homepage": "https://github.com/Synnode/CodeAtlas",
   "repository": "https://github.com/Synnode/CodeAtlas",
   "license": "MIT",
-  "keywords": ["wiki", "knowledge-base", "semantic-search", "ollama", "mcp"],
+  "keywords": [
+    "wiki",
+    "knowledge-base",
+    "semantic-search",
+    "ollama",
+    "mcp"
+  ],
   "commands": "./commands",
   "skills": "./skills"
 }
