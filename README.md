@@ -1,6 +1,6 @@
 # CodeAtlas
 
-A Claude Code plugin that gives every project a persistent, searchable wiki knowledge base. Semantic search via Ollama, keyword search via BM25, and full lifecycle management — all accessible as MCP tools and slash commands.
+A Claude Code plugin that gives every project a persistent, searchable wiki knowledge base. Semantic search via Ollama, keyword search via TF-IDF, and full lifecycle management — all accessible as MCP tools and slash commands.
 
 ---
 
@@ -115,7 +115,7 @@ plugins/wiki/
 │   ├── lib/
 │   │   ├── embedder.ts       # Ollama client
 │   │   ├── vector-store.ts   # sqlite-vec read/write/search
-│   │   ├── bm25.ts           # BM25 keyword index
+│   │   ├── tfidf.ts          # TF-IDF keyword index
 │   │   ├── rrf.ts            # Reciprocal Rank Fusion
 │   │   ├── chunker.ts        # Markdown-aware chunker
 │   │   └── wiki-fs.ts        # Filesystem helpers
