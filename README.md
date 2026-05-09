@@ -11,10 +11,11 @@ A Claude Code plugin that gives every project a persistent, searchable wiki know
   - `file` / `files[]` — local files from `RAW_ROOT`
   - `url` / `urls[]` — fetch from web pages or GitHub file URLs directly (GitHub blob URLs auto-converted to raw)
   - Deduplication: embeds a sample of each source and surfaces similar existing pages before Claude writes anything
+  - Sources truncated at 40k chars to prevent context overflow; truncation noted inline
 - **`/wiki-ingest <file>`** — ingest shortcut
 
 ### Search & retrieval
-- **`wiki_search`** — hybrid semantic + keyword search; supports `tags` filter
+- **`wiki_search`** — hybrid semantic + keyword search; supports `tags` filter; degrades to keyword-only if Ollama is unavailable
 - **`wiki_get`** — fetch a full wiki page by name
 - **`wiki_list`** — enumerate all pages with title, tags, updated date; supports tag filtering
 - **`wiki_context_for`** — given a source file path, extract filename + symbols and return the most relevant wiki pages automatically
