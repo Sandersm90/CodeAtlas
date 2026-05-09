@@ -76,6 +76,17 @@ Release script: bumps version in `package.json` AND `plugin.json` atomically, bu
 | `RAW_ROOT` | no | `""` | Directory for raw ingest source files |
 | `DB_PATH` | no | `$WIKI_ROOT/.embeddings.db` | SQLite database path |
 
+## Release checklist
+
+Before every release, verify:
+
+1. `README.md` reflects any new/changed behavior — tool descriptions, config, limits, fallbacks
+2. `ROADMAP.md` marks completed items as ✅ and lists new backlog items
+3. `CLAUDE.md` updated if architecture, gotchas, or workflow changed
+4. `git add -f CLAUDE.md` — always force-add, it's in global gitignore
+5. Commit all changes first, then run `npm run release` from `plugins/wiki/`
+6. Push with `git push origin main --tags`
+
 ## Version sync rule
 
 `plugins/wiki/package.json` and `plugins/wiki/.claude-plugin/plugin.json` must have the same `version`.
