@@ -9,32 +9,91 @@ description: >
 # Wiki Knowledge Base
 
 This project has a wiki knowledge base accessible via MCP tools.
+Always prefer wiki knowledge over assumptions. When in doubt, search first.
 
-## When to use (autonomous triggers)
+## Autonomous triggers — act without being asked
 
-- **Start of every task** — run `wiki_search` with 2-3 keywords before writing any code
-- **After implementing something new** — run `wiki_update` to record design decisions
-- **Uncertain about existing architecture** — run `wiki_search` before making assumptions
-- **User provides a spec, doc, or notes** — run `wiki_search` on the topic first for context, then run `wiki_ingest`
+| Situation | Action |
+|---|---|
+| Starting any non-trivial task | `wiki_search` with 2-3 relevant keywords |
+| Opening a source file | `wiki_context_for` with the file path |
+| After implementing or deciding something | `wiki_update` to record it |
+| User provides a spec, doc, notes, or URL | `wiki_search` for context → `wiki_ingest` |
+| After renaming, deleting, or large refactor | `wiki_lint` to catch broken links |
+| Wiki feels stale or out of sync | `wiki_reembed_all` to refresh vectors |
 
 ## Workflow
 
-1. `wiki_search(query)` — load relevant context
-2. Do the work
-3. `wiki_update(page, content)` — document what changed or was decided
+### Search (default starting point)
+```
+wiki_search({ query: "...", mode: "hybrid" })   // always start here
+wiki_get({ page: "PageName" })                  // when you need full content
+wiki_list({ tags: ["auth"] })                   // when you need an overview
+```
 
-## Tool reference
+### Open file → auto-load context
+```
+wiki_context_for({ path: "src/auth/middleware.ts" })
+```
+Run this immediately when opening any source file. Returns the most relevant
+wiki pages without you having to guess search terms.
 
-| Tool | When |
-|------|------|
-| `wiki_search` | Before starting any non-trivial task |
-| `wiki_get` | When you need a full page, not just an excerpt |
-| `wiki_update` | After implementing, deciding, or designing something |
-| `wiki_ingest` | When a new raw source is provided — always call `wiki_search` first for context |
-| `wiki_lint` | At the end of a large feature or refactor |
+### Ingest new source material
+```
+// Step 1 — prepare
+wiki_ingest({ file: "notes.md" })     // or url: "https://..."
 
-## Page format rules
+// Step 2 — wiki_ingest returns raw_files + instructions
+// Read the instructions field, then for each page call:
+wiki_update({ page: "PageName", content: "..." })
 
-Every wiki page must have YAML frontmatter with: `title`, `tags`, `related`, `updated`.
-Use `[[PageName]]` for cross-references. Keep the summary paragraph under 3 sentences.
-Never duplicate content that already exists on a linked page — reference it instead.
+// Never call wiki_ingest again inside the same ingest flow.
+```
+
+### Write / update
+```
+wiki_update({ page: "AuthMiddleware", content: "---\ntitle: ...\n---\n..." })
+wiki_update({ page: "AuthMiddleware", content: "...", dry_run: true })  // preview
+wiki_update({ page: "AuthMiddleware", content: "...", git_commit: true })
+```
+
+### Maintenance
+```
+wiki_lint()                          // health check — run after big changes
+wiki_lint({ fix: true })             // auto-fix missing updated dates
+wiki_rename({ from: "Old", to: "New" })  // rewrites all [[links]] atomically
+wiki_delete({ page: "Deprecated" })
+wiki_reembed_all()                   // re-embed stale pages only (default)
+wiki_reembed_all({ stale_only: false })  // force full re-embed
+```
+
+## Page format
+
+```markdown
+---
+title: "PageName"
+tags: [lowercase, hyphen-separated]
+related: ["OtherPage"]
+updated: 2026-05-09
+---
+
+# PageName
+
+One-paragraph summary (max 3 sentences).
+
+## Content
+...
+
+## Related
+- [[OtherPage]]
+```
+
+Required fields: `title`, `tags`, `updated`. Use `[[PageName]]` for all cross-references.
+
+## Rules
+
+- **Never duplicate** content that already exists on a linked page — reference it instead
+- **Never create a page** without real content to add — check for duplicates first with `wiki_search`
+- **Never call `wiki_ingest` twice** in the same flow — it returns instructions, then you call `wiki_update`
+- **Always search before ingesting** — prevents creating duplicate pages for existing concepts
+- **Keep summaries short** — the first paragraph should be ≤3 sentences; details go in sections below
