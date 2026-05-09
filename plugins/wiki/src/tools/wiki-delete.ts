@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readPage, deletePage } from "../lib/wiki-fs";
 import { deletePageVectors } from "../lib/vector-store";
-import { invalidateIndex } from "../lib/bm25";
+import { invalidateIndex } from "../lib/tfidf";
 import { getDb } from "../db";
 
 export const WikiDeleteSchema = z.object({

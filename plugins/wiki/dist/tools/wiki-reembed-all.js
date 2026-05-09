@@ -7,7 +7,7 @@ const wiki_fs_1 = require("../lib/wiki-fs");
 const chunker_1 = require("../lib/chunker");
 const embedder_1 = require("../lib/embedder");
 const vector_store_1 = require("../lib/vector-store");
-const bm25_1 = require("../lib/bm25");
+const tfidf_1 = require("../lib/tfidf");
 const db_1 = require("../db");
 exports.WikiReembedAllSchema = zod_1.z.object({
     stale_only: zod_1.z
@@ -58,7 +58,7 @@ async function wikiReembedAll(input) {
         }
     }
     if (reembedded.length > 0) {
-        (0, bm25_1.invalidateIndex)();
+        (0, tfidf_1.invalidateIndex)();
     }
     return {
         reembedded,

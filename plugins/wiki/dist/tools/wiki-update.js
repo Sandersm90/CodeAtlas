@@ -4,7 +4,7 @@
  *
  * MCP tool: wiki_update
  * Creates or updates a wiki page, re-embeds it in the vector store,
- * and invalidates the BM25 index.
+ * and invalidates the TF-IDF index.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -19,7 +19,7 @@ const wiki_fs_1 = require("../lib/wiki-fs");
 const chunker_1 = require("../lib/chunker");
 const embedder_1 = require("../lib/embedder");
 const vector_store_1 = require("../lib/vector-store");
-const bm25_1 = require("../lib/bm25");
+const tfidf_1 = require("../lib/tfidf");
 const db_1 = require("../db");
 exports.WikiUpdateSchema = zod_1.z.object({
     page: zod_1.z.string().min(1).describe("Page name without .md extension, e.g. 'AccessManager'"),
@@ -29,16 +29,20 @@ exports.WikiUpdateSchema = zod_1.z.object({
     git_commit: zod_1.z.boolean().optional().describe("If true, run git add + git commit after writing the page"),
 });
 function diffLines(oldText, newText) {
-    const oldLines = new Set(oldText.split("\n"));
-    const newLines = new Set(newText.split("\n"));
+    const count = (text) => {
+        const map = new Map();
+        for (const line of text.split("\n"))
+            map.set(line, (map.get(line) ?? 0) + 1);
+        return map;
+    };
+    const oldCounts = count(oldText);
+    const newCounts = count(newText);
     let added = 0;
     let removed = 0;
-    for (const line of newText.split("\n"))
-        if (!oldLines.has(line))
-            added++;
-    for (const line of oldText.split("\n"))
-        if (!newLines.has(line))
-            removed++;
+    for (const [line, n] of newCounts)
+        added += Math.max(0, n - (oldCounts.get(line) ?? 0));
+    for (const [line, n] of oldCounts)
+        removed += Math.max(0, n - (newCounts.get(line) ?? 0));
     return { added, removed };
 }
 /**
@@ -139,15 +143,15 @@ async function wikiUpdate(input) {
             code: "DB_ERROR",
         };
     }
-    // Invalidate BM25 index so it's rebuilt on next search
-    (0, bm25_1.invalidateIndex)();
+    // Invalidate TF-IDF index so it's rebuilt on next search
+    (0, tfidf_1.invalidateIndex)();
     // Optional git commit
     let gitCommitted;
     if (git_commit) {
         try {
-            (0, child_process_1.execSync)(`git add "${filePath}"`, { stdio: "pipe" });
+            (0, child_process_1.execFileSync)("git", ["add", filePath], { stdio: "pipe" });
             const verb = existingVectors.length === 0 ? "create" : "update";
-            (0, child_process_1.execSync)(`git commit -m "wiki: ${verb} ${page}"`, { stdio: "pipe" });
+            (0, child_process_1.execFileSync)("git", ["commit", "-m", `wiki: ${verb} ${page}`], { stdio: "pipe" });
             gitCommitted = true;
         }
         catch {

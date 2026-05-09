@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-for (const name of ['cli', 'index']) {
+for (const name of ['cli']) {
   const entry = path.join(__dirname, '..', 'dist', `${name}.js`);
   if (!fs.existsSync(entry)) continue;
   const content = fs.readFileSync(entry, 'utf8');

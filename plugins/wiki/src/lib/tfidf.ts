@@ -1,8 +1,7 @@
 /**
- * bm25.ts
+ * tfidf.ts
  *
- * BM25 keyword search over all wiki pages.
- * Uses the `natural` library's TfIdf as a BM25-like scorer.
+ * TF-IDF keyword search over all wiki pages using the `natural` library.
  *
  * - Index is built lazily on first search call.
  * - Index is invalidated (and rebuilt on next call) after wiki_update or wiki_ingest.
@@ -11,7 +10,7 @@
 import * as natural from "natural";
 import { readAllPages, WikiPage } from "./wiki-fs";
 
-export interface BM25Result {
+export interface TfIdfResult {
   page: string;
   excerpt: string;
   score: number;
@@ -22,6 +21,7 @@ interface IndexEntry {
   page: string;
   path: string;
   content: string;
+  tags: string[];
 }
 
 let tfidf: natural.TfIdf | null = null;
@@ -38,7 +38,7 @@ export function invalidateIndex(): void {
 }
 
 /**
- * Builds the BM25/TF-IDF index from all wiki pages.
+ * Builds the TF-IDF index from all wiki pages.
  */
 async function buildIndex(): Promise<void> {
   const pages: WikiPage[] = await readAllPages();
@@ -47,17 +47,33 @@ async function buildIndex(): Promise<void> {
   indexEntries = [];
 
   for (const page of pages) {
-    // Use plain body text for indexing (strip frontmatter)
+    const rawTags = page.frontmatter["tags"];
+    const tags: string[] = Array.isArray(rawTags)
+      ? (rawTags as string[]).map((t) => String(t).toLowerCase())
+      : [];
+
     const entry: IndexEntry = {
       page: page.name,
       path: page.path,
       content: page.body,
+      tags,
     };
     indexEntries.push(entry);
     tfidf.addDocument(page.body);
   }
 
   indexDirty = false;
+}
+
+/**
+ * Returns tags for a page from the in-memory index.
+ * Builds the index first if needed.
+ */
+export async function getPageTags(page: string): Promise<string[]> {
+  if (indexDirty || tfidf === null) {
+    await buildIndex();
+  }
+  return indexEntries.find((e) => e.page === page)?.tags ?? [];
 }
 
 /**
@@ -86,10 +102,10 @@ function extractExcerpt(content: string, query: string): string {
 }
 
 /**
- * Searches wiki pages using BM25/TF-IDF.
+ * Searches wiki pages using TF-IDF.
  * Returns top k results sorted by relevance score (descending).
  */
-export async function search(query: string, k: number): Promise<BM25Result[]> {
+export async function search(query: string, k: number): Promise<TfIdfResult[]> {
   if (indexDirty || tfidf === null) {
     await buildIndex();
   }

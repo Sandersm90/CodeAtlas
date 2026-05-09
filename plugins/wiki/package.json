@@ -15,16 +15,21 @@
     "build": "tsc && node scripts/postbuild.js",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "release": "node scripts/release.js",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
+  "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "latest",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^9.6.0",
     "glob": "^10.4.5",
     "gray-matter": "^4.0.3",
     "natural": "^6.12.0",
     "sqlite-vec": "^0.1.6",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",

@@ -3,7 +3,7 @@
  *
  * MCP tool: wiki_update
  * Creates or updates a wiki page, re-embeds it in the vector store,
- * and invalidates the BM25 index.
+ * and invalidates the TF-IDF index.
  */
 import { z } from "zod";
 export declare const WikiUpdateSchema: z.ZodObject<{

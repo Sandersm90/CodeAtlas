@@ -3,7 +3,7 @@
  * wiki-search.ts
  *
  * MCP tool: wiki_search
- * Hybrid semantic + BM25 keyword search across all wiki pages.
+ * Hybrid semantic + TF-IDF keyword search across all wiki pages.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WikiSearchSchema = void 0;
@@ -11,7 +11,7 @@ exports.wikiSearch = wikiSearch;
 const zod_1 = require("zod");
 const embedder_1 = require("../lib/embedder");
 const vector_store_1 = require("../lib/vector-store");
-const bm25_1 = require("../lib/bm25");
+const tfidf_1 = require("../lib/tfidf");
 const rrf_1 = require("../lib/rrf");
 const wiki_fs_1 = require("../lib/wiki-fs");
 const db_1 = require("../db");
@@ -24,13 +24,8 @@ exports.WikiSearchSchema = zod_1.z.object({
         .describe("Search mode: hybrid (default), semantic only, or keyword only"),
     tags: zod_1.z.array(zod_1.z.string()).optional().describe("Filter results to pages that have ALL specified tags"),
 });
-function matchesTags(page, requiredTags) {
-    const p = (0, wiki_fs_1.readPage)(page);
-    if (!p)
-        return false;
-    const pageTags = Array.isArray(p.frontmatter.tags)
-        ? p.frontmatter.tags.map((t) => t.toLowerCase())
-        : [];
+async function matchesTags(page, requiredTags) {
+    const pageTags = await (0, tfidf_1.getPageTags)(page);
     return requiredTags.every((t) => pageTags.includes(t.toLowerCase()));
 }
 /**
@@ -40,20 +35,23 @@ async function wikiSearch(input) {
     const { query, limit = 5, mode = "hybrid", tags } = input;
     const db = (0, db_1.getDb)();
     const filterLimit = tags && tags.length > 0 ? limit * 4 : limit;
-    const applyTagFilter = (items) => tags && tags.length > 0
-        ? items.filter((r) => matchesTags(r.page, tags)).slice(0, limit)
-        : items.slice(0, limit);
+    const applyTagFilter = async (items) => {
+        if (!tags || tags.length === 0)
+            return items.slice(0, limit);
+        const matches = await Promise.all(items.map((r) => matchesTags(r.page, tags)));
+        return items.filter((_, i) => matches[i]).slice(0, limit);
+    };
     if (mode === "keyword") {
         let kwResults;
         try {
-            kwResults = await (0, bm25_1.search)(query, filterLimit);
+            kwResults = await (0, tfidf_1.search)(query, filterLimit);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
         }
         return {
-            results: applyTagFilter(kwResults.map((r) => ({
+            results: await applyTagFilter(kwResults.map((r) => ({
                 page: r.page,
                 excerpt: r.excerpt,
                 score: r.score,
@@ -84,7 +82,7 @@ async function wikiSearch(input) {
                 seen.set(r.page, { page: r.page, excerpt: r.excerpt, score: r.score, path: (0, wiki_fs_1.resolvePage)(r.page) });
             }
         }
-        return { results: applyTagFilter(Array.from(seen.values())) };
+        return { results: await applyTagFilter(Array.from(seen.values())) };
     }
     // Hybrid: run both searches and combine with RRF
     const fetchCount = filterLimit * 3;
@@ -106,7 +104,7 @@ async function wikiSearch(input) {
     }
     let kwResults;
     try {
-        kwResults = await (0, bm25_1.search)(query, fetchCount);
+        kwResults = await (0, tfidf_1.search)(query, fetchCount);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -114,7 +112,7 @@ async function wikiSearch(input) {
     }
     const combined = (0, rrf_1.reciprocalRankFusion)(semResults, kwResults, 60, filterLimit);
     return {
-        results: applyTagFilter(combined.map((r) => ({
+        results: await applyTagFilter(combined.map((r) => ({
             page: r.page,
             excerpt: r.excerpt,
             score: r.score,

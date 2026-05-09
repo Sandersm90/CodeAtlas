@@ -2,7 +2,7 @@
  * wiki-search.ts
  *
  * MCP tool: wiki_search
- * Hybrid semantic + BM25 keyword search across all wiki pages.
+ * Hybrid semantic + TF-IDF keyword search across all wiki pages.
  */
 import { z } from "zod";
 export declare const WikiSearchSchema: z.ZodObject<{

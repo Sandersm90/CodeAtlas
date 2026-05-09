@@ -3,7 +3,7 @@ import { z } from "zod";
 import { extractSymbols } from "../lib/symbol-extractor";
 import { embed } from "../lib/embedder";
 import { searchSimilar } from "../lib/vector-store";
-import { search as bm25Search } from "../lib/bm25";
+import { search as kwSearch } from "../lib/tfidf";
 import { reciprocalRankFusion } from "../lib/rrf";
 import { resolvePage } from "../lib/wiki-fs";
 import { getDb } from "../db";
@@ -67,7 +67,7 @@ export async function wikiContextFor(input: WikiContextForInput): Promise<WikiCo
 
   let kwResults;
   try {
-    kwResults = await bm25Search(query, fetchCount);
+    kwResults = await kwSearch(query, fetchCount);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };

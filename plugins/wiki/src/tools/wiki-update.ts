@@ -3,17 +3,17 @@
  *
  * MCP tool: wiki_update
  * Creates or updates a wiki page, re-embeds it in the vector store,
- * and invalidates the BM25 index.
+ * and invalidates the TF-IDF index.
  */
 
 import { z } from "zod";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import matter from "gray-matter";
 import { readPage, writePage, validateFrontmatter, extractWikiLinks, pageExists } from "../lib/wiki-fs";
 import { chunkPage } from "../lib/chunker";
 import { embedBatch } from "../lib/embedder";
 import { upsertPage, ChunkVector, getChunkVectorsForPage } from "../lib/vector-store";
-import { invalidateIndex } from "../lib/bm25";
+import { invalidateIndex } from "../lib/tfidf";
 import { getDb } from "../db";
 
 export const WikiUpdateSchema = z.object({
@@ -53,12 +53,17 @@ export interface WikiUpdateError {
 export type WikiUpdateResult = WikiUpdateSuccess | WikiUpdateDryRun | WikiUpdateError;
 
 function diffLines(oldText: string, newText: string): { added: number; removed: number } {
-  const oldLines = new Set(oldText.split("\n"));
-  const newLines = new Set(newText.split("\n"));
+  const count = (text: string): Map<string, number> => {
+    const map = new Map<string, number>();
+    for (const line of text.split("\n")) map.set(line, (map.get(line) ?? 0) + 1);
+    return map;
+  };
+  const oldCounts = count(oldText);
+  const newCounts = count(newText);
   let added = 0;
   let removed = 0;
-  for (const line of newText.split("\n")) if (!oldLines.has(line)) added++;
-  for (const line of oldText.split("\n")) if (!newLines.has(line)) removed++;
+  for (const [line, n] of newCounts) added += Math.max(0, n - (oldCounts.get(line) ?? 0));
+  for (const [line, n] of oldCounts) removed += Math.max(0, n - (newCounts.get(line) ?? 0));
   return { added, removed };
 }
 
@@ -169,16 +174,16 @@ export async function wikiUpdate(input: WikiUpdateInput): Promise<WikiUpdateResu
     };
   }
 
-  // Invalidate BM25 index so it's rebuilt on next search
+  // Invalidate TF-IDF index so it's rebuilt on next search
   invalidateIndex();
 
   // Optional git commit
   let gitCommitted: boolean | undefined;
   if (git_commit) {
     try {
-      execSync(`git add "${filePath}"`, { stdio: "pipe" });
+      execFileSync("git", ["add", filePath], { stdio: "pipe" });
       const verb = existingVectors.length === 0 ? "create" : "update";
-      execSync(`git commit -m "wiki: ${verb} ${page}"`, { stdio: "pipe" });
+      execFileSync("git", ["commit", "-m", `wiki: ${verb} ${page}`], { stdio: "pipe" });
       gitCommitted = true;
     } catch {
       gitCommitted = false;

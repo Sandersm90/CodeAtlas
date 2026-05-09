@@ -2,15 +2,15 @@
  * wiki-search.ts
  *
  * MCP tool: wiki_search
- * Hybrid semantic + BM25 keyword search across all wiki pages.
+ * Hybrid semantic + TF-IDF keyword search across all wiki pages.
  */
 
 import { z } from "zod";
 import { embed } from "../lib/embedder";
 import { searchSimilar } from "../lib/vector-store";
-import { search as bm25Search } from "../lib/bm25";
+import { search as kwSearch, getPageTags } from "../lib/tfidf";
 import { reciprocalRankFusion, CombinedResult } from "../lib/rrf";
-import { resolvePage, readPage } from "../lib/wiki-fs";
+import { resolvePage } from "../lib/wiki-fs";
 import { getDb } from "../db";
 
 export const WikiSearchSchema = z.object({
@@ -43,12 +43,8 @@ export interface WikiSearchError {
 
 export type WikiSearchResult = WikiSearchSuccess | WikiSearchError;
 
-function matchesTags(page: string, requiredTags: string[]): boolean {
-  const p = readPage(page);
-  if (!p) return false;
-  const pageTags: string[] = Array.isArray(p.frontmatter.tags)
-    ? (p.frontmatter.tags as string[]).map((t) => t.toLowerCase())
-    : [];
+async function matchesTags(page: string, requiredTags: string[]): Promise<boolean> {
+  const pageTags = await getPageTags(page);
   return requiredTags.every((t) => pageTags.includes(t.toLowerCase()));
 }
 
@@ -60,22 +56,23 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
   const db = getDb();
   const filterLimit = tags && tags.length > 0 ? limit * 4 : limit;
 
-  const applyTagFilter = (items: SearchResultItem[]): SearchResultItem[] =>
-    tags && tags.length > 0
-      ? items.filter((r) => matchesTags(r.page, tags)).slice(0, limit)
-      : items.slice(0, limit);
+  const applyTagFilter = async (items: SearchResultItem[]): Promise<SearchResultItem[]> => {
+    if (!tags || tags.length === 0) return items.slice(0, limit);
+    const matches = await Promise.all(items.map((r) => matchesTags(r.page, tags)));
+    return items.filter((_, i) => matches[i]).slice(0, limit);
+  };
 
   if (mode === "keyword") {
     let kwResults;
     try {
-      kwResults = await bm25Search(query, filterLimit);
+      kwResults = await kwSearch(query, filterLimit);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
     }
 
     return {
-      results: applyTagFilter(kwResults.map((r) => ({
+      results: await applyTagFilter(kwResults.map((r) => ({
         page: r.page,
         excerpt: r.excerpt,
         score: r.score,
@@ -108,7 +105,7 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
       }
     }
 
-    return { results: applyTagFilter(Array.from(seen.values())) };
+    return { results: await applyTagFilter(Array.from(seen.values())) };
   }
 
   // Hybrid: run both searches and combine with RRF
@@ -132,7 +129,7 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
 
   let kwResults;
   try {
-    kwResults = await bm25Search(query, fetchCount);
+    kwResults = await kwSearch(query, fetchCount);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: `Keyword search failed: ${message}`, code: "SEARCH_ERROR" };
@@ -141,7 +138,7 @@ export async function wikiSearch(input: WikiSearchInput): Promise<WikiSearchResu
   const combined: CombinedResult[] = reciprocalRankFusion(semResults, kwResults, 60, filterLimit);
 
   return {
-    results: applyTagFilter(combined.map((r) => ({
+    results: await applyTagFilter(combined.map((r) => ({
       page: r.page,
       excerpt: r.excerpt,
       score: r.score,

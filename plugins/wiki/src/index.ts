@@ -12,6 +12,14 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { zodToJsonSchema: _z2j } = require("zod-to-json-schema") as {
+  zodToJsonSchema: (schema: unknown, opts: unknown) => Record<string, unknown>;
+};
+
+function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+  return _z2j(schema, { $refStrategy: "none" });
+}
 
 // Config is loaded (and validated) at import time — exits if required vars missing
 import { config } from "./config";
@@ -31,62 +39,6 @@ import { wikiList, WikiListSchema } from "./tools/wiki-list";
 // Initialize DB at startup so errors surface early
 import { initializeDb, getDb } from "./db";
 
-/**
- * Converts a Zod schema to a JSON Schema object suitable for MCP tool definitions.
- */
-function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
-  const shape = schema.shape;
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-
-  for (const [key, field] of Object.entries(shape)) {
-    const zodField = field as z.ZodTypeAny;
-    const isOptional =
-      zodField instanceof z.ZodOptional || zodField instanceof z.ZodDefault;
-
-    const innerField = isOptional
-      ? (zodField as z.ZodOptional<z.ZodTypeAny>).unwrap?.() ?? zodField
-      : zodField;
-
-    const description =
-      (zodField as { description?: string }).description ?? undefined;
-
-    let type = "string";
-    let extra: Record<string, unknown> = {};
-
-    const unwrapped =
-      innerField instanceof z.ZodDefault
-        ? (innerField as z.ZodDefault<z.ZodTypeAny>)._def.innerType
-        : innerField;
-
-    if (unwrapped instanceof z.ZodNumber) {
-      type = "number";
-    } else if (unwrapped instanceof z.ZodBoolean) {
-      type = "boolean";
-    } else if (unwrapped instanceof z.ZodEnum) {
-      type = "string";
-      extra["enum"] = (unwrapped as z.ZodEnum<[string, ...string[]]>).options;
-    } else if (unwrapped instanceof z.ZodArray) {
-      type = "array";
-    }
-
-    properties[key] = {
-      type,
-      ...(description ? { description } : {}),
-      ...extra,
-    };
-
-    if (!isOptional) {
-      required.push(key);
-    }
-  }
-
-  return {
-    type: "object",
-    properties,
-    ...(required.length > 0 ? { required } : {}),
-  };
-}
 
 async function main(): Promise<void> {
   // Initialize DB (detects embedding dim from Ollama if needed)
@@ -123,7 +75,7 @@ async function main(): Promise<void> {
         {
           name: "wiki_search",
           description:
-            "Search the wiki using hybrid semantic + BM25 keyword search. Returns ranked results with excerpts.",
+            "Search the wiki using hybrid semantic + keyword search (TF-IDF). Returns ranked results with excerpts.",
           inputSchema: zodToJsonSchema(WikiSearchSchema),
         },
         {

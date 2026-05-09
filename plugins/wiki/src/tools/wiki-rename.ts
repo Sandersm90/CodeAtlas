@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readPage, renamePage, rewriteLinksInAllPages } from "../lib/wiki-fs";
 import { renamePageVectors } from "../lib/vector-store";
-import { invalidateIndex } from "../lib/bm25";
+import { invalidateIndex } from "../lib/tfidf";
 import { getDb } from "../db";
 
 export const WikiRenameSchema = z.object({

@@ -40,7 +40,7 @@ const zod_1 = require("zod");
 const symbol_extractor_1 = require("../lib/symbol-extractor");
 const embedder_1 = require("../lib/embedder");
 const vector_store_1 = require("../lib/vector-store");
-const bm25_1 = require("../lib/bm25");
+const tfidf_1 = require("../lib/tfidf");
 const rrf_1 = require("../lib/rrf");
 const wiki_fs_1 = require("../lib/wiki-fs");
 const db_1 = require("../db");
@@ -77,7 +77,7 @@ async function wikiContextFor(input) {
     }
     let kwResults;
     try {
-        kwResults = await (0, bm25_1.search)(query, fetchCount);
+        kwResults = await (0, tfidf_1.search)(query, fetchCount);
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
