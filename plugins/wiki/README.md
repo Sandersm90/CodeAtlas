@@ -42,7 +42,7 @@ claude plugin install github:synnode/codeatlas
 
 | Tool | Description |
 |---|---|
-| `wiki_search` | Hybrid semantic + BM25 keyword search |
+| `wiki_search` | Hybrid semantic + TF-IDF keyword search |
 | `wiki_get` | Fetch full page by name |
 | `wiki_update` | Create or update a page (re-embeds automatically) |
 | `wiki_ingest` | Process a raw file into wiki pages via Claude |

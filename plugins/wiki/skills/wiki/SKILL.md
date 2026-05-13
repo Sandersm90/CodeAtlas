@@ -3,7 +3,8 @@ name: wiki
 description: >
   Use this skill to interact with the project wiki knowledge base.
   Invoke autonomously when starting a task, after implementing something new,
-  or when uncertain about existing architecture.
+  after discovering something non-obvious (a gotcha, constraint, or design decision),
+  after debugging or investigating a problem, or when uncertain about existing architecture.
 ---
 
 # Wiki Knowledge Base
@@ -18,6 +19,8 @@ Always prefer wiki knowledge over assumptions. When in doubt, search first.
 | Starting any non-trivial task | `wiki_search` with 2-3 relevant keywords |
 | Opening a source file | `wiki_context_for` with the file path |
 | After implementing or deciding something | `wiki_update` to record it |
+| After discovering a gotcha, constraint, or non-obvious behavior | `wiki_update` to record the finding |
+| After debugging or root-causing a problem | `wiki_update` with cause + fix, so next session doesn't re-investigate |
 | User provides a spec, doc, notes, or URL | `wiki_search` for context → `wiki_ingest` |
 | After renaming, deleting, or large refactor | `wiki_lint` to catch broken links |
 | Wiki feels stale or out of sync | `wiki_reembed_all` to refresh vectors |

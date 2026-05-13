@@ -38,7 +38,7 @@ A Claude Code plugin that gives every project a persistent, searchable wiki know
 ### Bootstrap
 - **`/wiki-init`** — bootstrap the wiki in any project (creates `wiki/`, `raw/`, `.mcp.json`)
 
-The wiki skill auto-triggers: Claude searches before starting a task, updates after implementing something, and ingests when you provide a spec or notes.
+The wiki skill auto-triggers: Claude searches before starting a task, updates after implementing or deciding something, records gotchas and debugging findings as they surface, and ingests when you provide a spec or notes.
 
 ---
 
