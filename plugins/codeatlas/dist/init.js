@@ -101,7 +101,7 @@ async function runInit(args) {
     else {
         const config = {
             mcpServers: {
-                wiki: {
+                codeatlas: {
                     type: "stdio",
                     command: "codeatlas",
                     args: [],
@@ -119,7 +119,7 @@ async function runInit(args) {
     }
     // 5. Update CLAUDE.md
     const claudeMd = path.join(cwd, "CLAUDE.md");
-    const wikiSection = `\n## Wiki\nThis project uses the wiki MCP skill. See ~/.claude/skills/wiki/SKILL.md\nfor the full workflow. OLLAMA_URL in .mcp.json must point to your Ollama instance.\n`;
+    const wikiSection = `\n## Wiki\nThis project uses the CodeAtlas wiki MCP skill. See the skill docs for the full workflow.\nOLLAMA_URL in .mcp.json must point to your Ollama instance.\n`;
     const claudeContent = fs.existsSync(claudeMd) ? fs.readFileSync(claudeMd, "utf8") : "";
     if (!claudeContent.includes("## Wiki")) {
         fs.writeFileSync(claudeMd, claudeContent + wikiSection);
