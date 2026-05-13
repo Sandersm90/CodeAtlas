@@ -2,7 +2,7 @@
 name: wiki-search
 description: Search the wiki knowledge base
 argument-hint: <query>
-allowed-tools: mcp__wiki__wiki_search
+allowed-tools: mcp__codeatlas__wiki_search
 ---
 
 Search the wiki for `$ARGUMENTS` using hybrid search.

@@ -15,7 +15,7 @@ Add to your project's `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "wiki": {
+    "codeatlas": {
       "command": "npx",
       "args": ["-y", "@synnode/codeatlas"],
       "env": {

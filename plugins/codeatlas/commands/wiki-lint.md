@@ -1,7 +1,7 @@
 ---
 name: wiki-lint
 description: Run a health check on the wiki and report issues
-allowed-tools: mcp__wiki__wiki_lint
+allowed-tools: mcp__codeatlas__wiki_lint
 ---
 
 Run `wiki_lint` and present the results in a readable summary.

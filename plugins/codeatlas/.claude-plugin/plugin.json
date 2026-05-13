@@ -1,5 +1,5 @@
 {
-  "name": "wiki",
+  "name": "codeatlas",
   "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
   "version": "1.4.9",
   "author": {

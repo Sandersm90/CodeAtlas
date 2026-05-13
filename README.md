@@ -61,7 +61,7 @@ npm install -g @synnode/codeatlas
 /plugin marketplace add synnode/codeatlas
 
 # 3. Install the wiki plugin
-/plugin install wiki@codeatlas
+/plugin install codeatlas@synnode
 ```
 
 Then in any project you want to use the wiki:
@@ -108,7 +108,7 @@ Required frontmatter fields: `title`, `tags`, `updated`. Use `[[PageName]]` for 
 ## Project layout
 
 ```
-plugins/wiki/
+plugins/codeatlas/
 ├── src/
 │   ├── index.ts              # MCP server entrypoint
 │   ├── config.ts             # Env var loading

@@ -4,7 +4,7 @@
 
 ```
 .claude-plugin/marketplace.json         # root-level plugin registry
-plugins/wiki/
+plugins/codeatlas/
   .claude-plugin/plugin.json            # plugin metadata (version must match package.json)
   commands/                             # slash commands (markdown, loaded by Claude Code)
   skills/wiki/SKILL.md                  # skill prompt (auto-triggers on wiki tasks)
@@ -56,7 +56,7 @@ Release script: bumps version in `package.json` AND `plugin.json` atomically, bu
 
 **`zodToJsonSchema` in `index.ts`** — uses `require('zod-to-json-schema')` instead of an `import` because the library's generic types cause tsc to OOM at ~4GB heap when used with a normal import + type inference. The `require` bypasses type evaluation entirely. Do not convert this to an `import`.
 
-**Native modules** — `better-sqlite3` and `sqlite-vec` are native Node addons. They must be compiled for the running Node version. `postinstall.js` handles this automatically; if the MCP server crashes on load, run `npm rebuild better-sqlite3 sqlite-vec` in `plugins/wiki/`.
+**Native modules** — `better-sqlite3` and `sqlite-vec` are native Node addons. They must be compiled for the running Node version. `postinstall.js` handles this automatically; if the MCP server crashes on load, run `npm rebuild better-sqlite3 sqlite-vec` in `plugins/codeatlas/`.
 
 **TF-IDF, not BM25** — `tfidf.ts` uses `natural.TfIdf`. Does not normalize by document length. Renamed from `bm25.ts` in v1.4.x.
 
@@ -84,11 +84,11 @@ Before every release, verify:
 2. `ROADMAP.md` marks completed items as ✅ and lists new backlog items
 3. `CLAUDE.md` updated if architecture, gotchas, or workflow changed
 4. `git add -f CLAUDE.md` — always force-add, it's in global gitignore
-5. Commit all changes first, then run `npm run release` from `plugins/wiki/`
+5. Commit all changes first, then run `npm run release` from `plugins/codeatlas/`
 6. Push with `git push origin main --tags`
 
 ## Version sync rule
 
-`plugins/wiki/package.json` and `plugins/wiki/.claude-plugin/plugin.json` must have the same `version`.
+`plugins/codeatlas/package.json` and `plugins/codeatlas/.claude-plugin/plugin.json` must have the same `version`.
 
 **Always use `npm run release` to publish.** Never bump versions manually or run `npm publish` directly — the release script is the only safe path because it syncs both files atomically and aborts if they are already out of sync. If you bump manually, the next release will fail with a version mismatch error.

@@ -2,7 +2,7 @@
 name: wiki-ingest
 description: Process a file from raw/ into wiki pages
 argument-hint: <filename>
-allowed-tools: mcp__wiki__wiki_ingest
+allowed-tools: mcp__codeatlas__wiki_ingest
 ---
 
 Ingest the file `$ARGUMENTS` from the raw/ directory into the wiki.

@@ -8,9 +8,9 @@
   },
   "plugins": [
     {
-      "name": "wiki",
+      "name": "codeatlas",
       "description": "LLM wiki knowledge base — semantic search, ingest, and lifecycle management",
-      "source": "./plugins/wiki",
+      "source": "./plugins/codeatlas",
       "category": "productivity"
     }
   ]
