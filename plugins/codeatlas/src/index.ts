@@ -12,13 +12,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { zodToJsonSchema: _z2j } = require("zod-to-json-schema") as {
-  zodToJsonSchema: (schema: unknown, opts: unknown) => Record<string, unknown>;
-};
 
 function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  return _z2j(schema, { $refStrategy: "none" });
+  return z.toJSONSchema(schema, { reused: "inline" }) as Record<string, unknown>;
 }
 
 // Config is loaded (and validated) at import time — exits if required vars missing
