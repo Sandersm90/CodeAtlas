@@ -1,11 +1,7 @@
 import { z } from "zod";
 export declare const WikiDeleteSchema: z.ZodObject<{
     page: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    page: string;
-}, {
-    page: string;
-}>;
+}, z.core.$strip>;
 export type WikiDeleteInput = z.infer<typeof WikiDeleteSchema>;
 export interface WikiDeleteSuccess {
     success: true;

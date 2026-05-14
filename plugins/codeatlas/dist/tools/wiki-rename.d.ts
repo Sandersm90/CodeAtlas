@@ -2,13 +2,7 @@ import { z } from "zod";
 export declare const WikiRenameSchema: z.ZodObject<{
     page: z.ZodString;
     new_name: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    page: string;
-    new_name: string;
-}, {
-    page: string;
-    new_name: string;
-}>;
+}, z.core.$strip>;
 export type WikiRenameInput = z.infer<typeof WikiRenameSchema>;
 export interface WikiRenameSuccess {
     success: true;

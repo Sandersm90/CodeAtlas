@@ -10,10 +10,8 @@ const index_js_1 = require("@modelcontextprotocol/sdk/server/index.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
 const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
 const zod_1 = require("zod");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { zodToJsonSchema: _z2j } = require("zod-to-json-schema");
 function zodToJsonSchema(schema) {
-    return _z2j(schema, { $refStrategy: "none" });
+    return zod_1.z.toJSONSchema(schema, { reused: "inline" });
 }
 // Config is loaded (and validated) at import time — exits if required vars missing
 const config_1 = require("./config");

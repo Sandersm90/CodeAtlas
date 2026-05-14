@@ -2,13 +2,7 @@ import { z } from "zod";
 export declare const WikiContextForSchema: z.ZodObject<{
     file: z.ZodString;
     limit: z.ZodDefault<z.ZodNumber>;
-}, "strip", z.ZodTypeAny, {
-    limit: number;
-    file: string;
-}, {
-    file: string;
-    limit?: number | undefined;
-}>;
+}, z.core.$strip>;
 export type WikiContextForInput = z.infer<typeof WikiContextForSchema>;
 export interface WikiContextForSuccess {
     file: string;

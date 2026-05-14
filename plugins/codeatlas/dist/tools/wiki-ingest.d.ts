@@ -1,54 +1,18 @@
 import { z } from "zod";
 export declare const WikiIngestBaseSchema: z.ZodObject<{
     file: z.ZodOptional<z.ZodString>;
-    files: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    files: z.ZodOptional<z.ZodArray<z.ZodString>>;
     url: z.ZodOptional<z.ZodString>;
-    urls: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    urls: z.ZodOptional<z.ZodArray<z.ZodString>>;
     hint: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}>;
-export declare const WikiIngestSchema: z.ZodEffects<z.ZodObject<{
+}, z.core.$strip>;
+export declare const WikiIngestSchema: z.ZodObject<{
     file: z.ZodOptional<z.ZodString>;
-    files: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    files: z.ZodOptional<z.ZodArray<z.ZodString>>;
     url: z.ZodOptional<z.ZodString>;
-    urls: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    urls: z.ZodOptional<z.ZodArray<z.ZodString>>;
     hint: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}>, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}, {
-    file?: string | undefined;
-    files?: string[] | undefined;
-    url?: string | undefined;
-    urls?: string[] | undefined;
-    hint?: string | undefined;
-}>;
+}, z.core.$strip>;
 export type WikiIngestInput = z.infer<typeof WikiIngestSchema>;
 export interface DuplicateCandidate {
     page: string;

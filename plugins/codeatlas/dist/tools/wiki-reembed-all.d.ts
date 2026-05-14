@@ -1,11 +1,7 @@
 import { z } from "zod";
 export declare const WikiReembedAllSchema: z.ZodObject<{
     stale_only: z.ZodOptional<z.ZodBoolean>;
-}, "strip", z.ZodTypeAny, {
-    stale_only?: boolean | undefined;
-}, {
-    stale_only?: boolean | undefined;
-}>;
+}, z.core.$strip>;
 export type WikiReembedAllInput = z.infer<typeof WikiReembedAllSchema>;
 export interface WikiReembedAllResult {
     reembedded: string[];

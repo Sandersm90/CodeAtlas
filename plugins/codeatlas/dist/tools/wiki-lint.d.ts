@@ -14,11 +14,7 @@
 import { z } from "zod";
 export declare const WikiLintSchema: z.ZodObject<{
     fix: z.ZodOptional<z.ZodBoolean>;
-}, "strip", z.ZodTypeAny, {
-    fix?: boolean | undefined;
-}, {
-    fix?: boolean | undefined;
-}>;
+}, z.core.$strip>;
 export type WikiLintInput = z.infer<typeof WikiLintSchema>;
 export interface BrokenLink {
     page: string;

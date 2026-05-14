@@ -12,19 +12,7 @@ export declare const WikiUpdateSchema: z.ZodObject<{
     reason: z.ZodOptional<z.ZodString>;
     dry_run: z.ZodOptional<z.ZodBoolean>;
     git_commit: z.ZodOptional<z.ZodBoolean>;
-}, "strip", z.ZodTypeAny, {
-    content: string;
-    page: string;
-    reason?: string | undefined;
-    dry_run?: boolean | undefined;
-    git_commit?: boolean | undefined;
-}, {
-    content: string;
-    page: string;
-    reason?: string | undefined;
-    dry_run?: boolean | undefined;
-    git_commit?: boolean | undefined;
-}>;
+}, z.core.$strip>;
 export type WikiUpdateInput = z.infer<typeof WikiUpdateSchema>;
 export interface WikiUpdateSuccess {
     success: true;

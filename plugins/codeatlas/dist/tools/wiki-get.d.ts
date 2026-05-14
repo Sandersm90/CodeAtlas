@@ -7,11 +7,7 @@
 import { z } from "zod";
 export declare const WikiGetSchema: z.ZodObject<{
     page: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    page: string;
-}, {
-    page: string;
-}>;
+}, z.core.$strip>;
 export type WikiGetInput = z.infer<typeof WikiGetSchema>;
 export interface WikiGetSuccess {
     content: string;
